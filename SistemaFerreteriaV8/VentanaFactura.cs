@@ -70,7 +70,7 @@ namespace SistemaFerreteriaV8
         private void AjustarLayoutFactura()
         {
             const int margen = 16;
-            const int separacion = 8;
+            const int separacion = 10;
             int anchoUtil = ClientSize.Width - (margen * 2);
 
             Titulo.Location = new Point((ClientSize.Width - Titulo.Width) / 2, 18);
@@ -79,28 +79,45 @@ namespace SistemaFerreteriaV8
             label7.Location = new Point((ClientSize.Width / 2) - 50, tel.Bottom + separacion);
             RNC.Location = new Point(label7.Right + 6, label7.Top);
 
-            TipoFactura.Location = new Point(margen, label7.Bottom + 28);
+            TipoFactura.Location = new Point(margen, label7.Bottom + 24);
 
-            int yInfo = TipoFactura.Bottom + 12;
-            label4.Location = new Point(margen, yInfo);
-            NFC.Location = new Point(label4.Right + 6, yInfo);
-            label9.Location = new Point(margen, yInfo + 24);
-            Valido.Location = new Point(label9.Right + 6, yInfo + 24);
+            int labelColX = margen;
+            int labelColW = 95;
+            int valueColX = labelColX + labelColW + 6;
+            int valueColW = 290;
+            int rowY = TipoFactura.Bottom + 12;
+            int rowGap = 30;
 
-            label8.Location = new Point(ClientSize.Width - 190, yInfo);
-            IdFactura.Location = new Point(label8.Right + 6, yInfo - 2);
+            void AlignRow(Label label, Label value, string fallback = "")
+            {
+                label.AutoSize = false;
+                label.TextAlign = ContentAlignment.MiddleRight;
+                label.Location = new Point(labelColX, rowY);
+                label.Size = new Size(labelColW, 22);
+
+                value.AutoSize = false;
+                value.AutoEllipsis = true;
+                value.Location = new Point(valueColX, rowY);
+                value.Size = new Size(valueColW, 22);
+                value.TextAlign = ContentAlignment.MiddleLeft;
+                if (string.IsNullOrWhiteSpace(value.Text))
+                    value.Text = fallback;
+
+                rowY += rowGap;
+            }
+
+            AlignRow(label4, NFC, "—");
+            AlignRow(label9, Valido, "—");
+            AlignRow(label10, Fecha, "—");
+            AlignRow(label12, RNCCliente, "—");
+            AlignRow(label14, Cliente, "Generico");
+            AlignRow(label11, Direccion, "—");
+
+            label8.Location = new Point(ClientSize.Width - 190, TipoFactura.Bottom + 16);
+            IdFactura.Location = new Point(label8.Right + 6, TipoFactura.Bottom + 14);
             IdFactura.Width = 90;
 
-            label10.Location = new Point(margen, yInfo + 52);
-            Fecha.Location = new Point(label10.Right + 6, yInfo + 52);
-            label12.Location = new Point(margen, yInfo + 80);
-            RNCCliente.Location = new Point(label12.Right + 6, yInfo + 80);
-            label14.Location = new Point(margen, yInfo + 108);
-            Cliente.Location = new Point(label14.Right + 6, yInfo + 108);
-            label11.Location = new Point(margen, yInfo + 136);
-            Direccion.Location = new Point(label11.Right + 6, yInfo + 136);
-
-            dataGridView1.Location = new Point(margen, yInfo + 168);
+            dataGridView1.Location = new Point(margen, rowY + 6);
             dataGridView1.Size = new Size(anchoUtil, Math.Max(170, ClientSize.Height - dataGridView1.Top - 150));
 
             int yPie = dataGridView1.Bottom + 8;
