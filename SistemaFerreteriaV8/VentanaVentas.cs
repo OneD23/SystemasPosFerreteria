@@ -379,8 +379,6 @@ namespace SistemaFerreteriaV8
 
             // 3. Crear o actualizar factura
             int idFactura = facturaActiva?.Id ?? 0;
-            if (idFactura <= 0 && int.TryParse(NoFactura.Text, out var idTmp))
-                idFactura = idTmp;
 
             // IMPORTANTE:
             // Si la factura fue cargada para edición/reimpresión, nunca debe generar un nuevo ID.
@@ -399,6 +397,7 @@ namespace SistemaFerreteriaV8
             }
             else if (idFactura <= 0)
             {
+                // Se toma siempre el ID más alto real en facturas y se le suma 1.
                 idFactura = Factura.GenerarSiguienteId();
             }
 
