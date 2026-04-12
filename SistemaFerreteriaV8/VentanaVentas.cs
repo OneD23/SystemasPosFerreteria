@@ -173,6 +173,14 @@ namespace SistemaFerreteriaV8
         {
             KeyPreview = true;
             NombreABuscar.KeyDown += NombreABuscar_KeyDown;
+            ADescontar.KeyDown += (_, e) =>
+            {
+                if (e.KeyCode != Keys.Enter) return;
+                e.SuppressKeyPress = true;
+                AsignarTotales();
+            };
+            ADescontar.Leave += (_, _) => AsignarTotales();
+            FiltroDescuento.SelectedIndexChanged += (_, _) => AsignarTotales();
             KeyDown += (_, e) =>
             {
                 if (e.KeyCode != Keys.Escape) return;
