@@ -121,8 +121,10 @@ namespace SistemaFerreteriaV8
             dataGridView1.Size = new Size(anchoUtil, Math.Max(170, ClientSize.Height - dataGridView1.Top - 150));
 
             int yPie = dataGridView1.Bottom + 8;
-            label13.Location = new Point(ClientSize.Width - 118, yPie);
-            total.Location = new Point(ClientSize.Width - 78, yPie);
+            total.AutoSize = true;
+            label13.AutoSize = true;
+            total.Location = new Point(ClientSize.Width - margen - total.Width, yPie);
+            label13.Location = new Point(total.Left - 8 - label13.Width, yPie);
 
             int wBtn = 120;
             int hBtn = 44;
