@@ -21,6 +21,8 @@ namespace SistemaFerreteriaV8
             SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
             ModernizarFormulario();
             ConfigurarAtajosTeclado();
+            AjustarLayoutFactura();
+            Resize += (_, _) => AjustarLayoutFactura();
         }
 
         private void ModernizarFormulario()
@@ -65,6 +67,55 @@ namespace SistemaFerreteriaV8
             };
         }
 
+        private void AjustarLayoutFactura()
+        {
+            const int margen = 16;
+            const int separacion = 8;
+            int anchoUtil = ClientSize.Width - (margen * 2);
+
+            Titulo.Location = new Point((ClientSize.Width - Titulo.Width) / 2, 18);
+            DireccionNegocio.Location = new Point((ClientSize.Width - DireccionNegocio.Width) / 2, Titulo.Bottom + separacion);
+            tel.Location = new Point((ClientSize.Width - tel.Width) / 2, DireccionNegocio.Bottom + separacion);
+            label7.Location = new Point((ClientSize.Width / 2) - 50, tel.Bottom + separacion);
+            RNC.Location = new Point(label7.Right + 6, label7.Top);
+
+            TipoFactura.Location = new Point(margen, label7.Bottom + 28);
+
+            int yInfo = TipoFactura.Bottom + 12;
+            label4.Location = new Point(margen, yInfo);
+            NFC.Location = new Point(label4.Right + 6, yInfo);
+            label9.Location = new Point(margen, yInfo + 24);
+            Valido.Location = new Point(label9.Right + 6, yInfo + 24);
+
+            label8.Location = new Point(ClientSize.Width - 190, yInfo);
+            IdFactura.Location = new Point(label8.Right + 6, yInfo - 2);
+            IdFactura.Width = 90;
+
+            label10.Location = new Point(margen, yInfo + 52);
+            Fecha.Location = new Point(label10.Right + 6, yInfo + 52);
+            label12.Location = new Point(margen, yInfo + 80);
+            RNCCliente.Location = new Point(label12.Right + 6, yInfo + 80);
+            label14.Location = new Point(margen, yInfo + 108);
+            Cliente.Location = new Point(label14.Right + 6, yInfo + 108);
+            label11.Location = new Point(margen, yInfo + 136);
+            Direccion.Location = new Point(label11.Right + 6, yInfo + 136);
+
+            dataGridView1.Location = new Point(margen, yInfo + 168);
+            dataGridView1.Size = new Size(anchoUtil, Math.Max(170, ClientSize.Height - dataGridView1.Top - 150));
+
+            int yPie = dataGridView1.Bottom + 8;
+            label13.Location = new Point(ClientSize.Width - 118, yPie);
+            total.Location = new Point(ClientSize.Width - 78, yPie);
+
+            int wBtn = 120;
+            int hBtn = 44;
+            int yBtns = ClientSize.Height - hBtn - 16;
+            button2.SetBounds(margen, yBtns, wBtn, hBtn);
+            button1.SetBounds(button2.Right + 20, yBtns, wBtn, hBtn);
+            Actualizar.SetBounds(button1.Right + 20, yBtns, wBtn, hBtn);
+            Eliminar.SetBounds(Actualizar.Right + 20, yBtns, wBtn, hBtn);
+        }
+
         private void MostrarEstado(string mensaje, bool error = false)
         {
             UiConsistencia.MostrarEstado(lblEstado, mensaje, error);
@@ -106,6 +157,8 @@ namespace SistemaFerreteriaV8
                 }
                 total.Text = Factura.Total.ToString("c2");
             }
+
+            AjustarLayoutFactura();
         }
 
         private async void Eliminar_Click(object sender, EventArgs e)

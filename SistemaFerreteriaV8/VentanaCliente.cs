@@ -30,7 +30,7 @@ namespace SistemaFerreteriaV8
         {
             int margen = 12;
             int espacio = 12;
-            int altoFormulario = 380;
+            int altoFormulario = 430;
 
             groupBox1.Location = new Point(margen, margen);
             groupBox1.Size = new Size(430, altoFormulario);
@@ -38,13 +38,14 @@ namespace SistemaFerreteriaV8
             groupBox2.Size = new Size(Math.Max(450, ClientSize.Width - groupBox1.Width - margen * 2 - espacio), altoFormulario);
 
             int xLabel = 16;
-            int wLabel = 120;
-            int xInput = 145;
-            int inputWidth = 240;
+            var labels = new[] { label5, label1, label2, label4, label3, label7, label6, label8 };
+            int wLabel = labels.Max(l => TextRenderer.MeasureText(l.Text, l.Font).Width) + 12;
+            int xInput = xLabel + wLabel + 14;
+            int inputWidth = Math.Max(170, groupBox1.Width - xInput - 26);
             int y = 36;
             int gap = 34;
 
-            foreach (var lbl in new[] { label5, label1, label2, label4, label3, label7, label6, label8 })
+            foreach (var lbl in labels)
             {
                 lbl.AutoSize = false;
                 lbl.TextAlign = ContentAlignment.MiddleRight;
@@ -61,12 +62,13 @@ namespace SistemaFerreteriaV8
                 y += gap;
             }
 
-            Id.Width = 140;
+            Id.Width = Math.Min(160, Math.Max(110, inputWidth - 100));
             foreach (var input in new Control[] { Nombre, Cedula, Direccion, Telefono, Correo, LimiteCredito, CreditoActivo2 })
                 input.Width = inputWidth;
 
-            button1.Location = new Point(xInput + Id.Width + 10, Id.Top);
             button1.Width = 90;
+            button1.Location = new Point(groupBox1.Width - button1.Width - 14, Id.Top);
+            Id.Width = Math.Max(110, button1.Left - xInput - 10);
 
             ListaDeClientes.Location = new Point(10, 22);
             ListaDeClientes.Size = new Size(groupBox2.Width - 20, groupBox2.Height - 32);
@@ -75,10 +77,10 @@ namespace SistemaFerreteriaV8
             ListaDeClientes.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             ListaDeClientes.MultiSelect = false;
 
-            int yBotones = groupBox1.Height - 106;
             int wBtn = 92;
             int hBtn = 36;
             int sep = 10;
+            int yBotones = CreditoActivo2.Bottom + 12;
             Nuevo.SetBounds(28, yBotones, wBtn, hBtn);
             Editar.SetBounds(28 + wBtn + sep, yBotones, wBtn, hBtn);
             Guardar.SetBounds(28 + ((wBtn + sep) * 2), yBotones, wBtn, hBtn);
