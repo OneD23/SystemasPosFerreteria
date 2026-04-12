@@ -39,9 +39,11 @@ namespace SistemaFerreteriaV8
             InitializeComponent();
             SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
             AjustarAlineacionVisual();
+            AjustarLayoutBusquedaPorNombre();
             ModernizarControlesVenta();
             WireFastCheckoutEvents();
             _searchDebounceTimer.Tick += async (_, _) => await EjecutarBusquedaProductosAsync();
+            Resize += (_, _) => AjustarLayoutBusquedaPorNombre();
         }
         private void AjustarAlineacionVisual()
         {
@@ -135,6 +137,25 @@ namespace SistemaFerreteriaV8
             statusTimer.Tick += (_, _) => { Aviso.Visible = false; statusTimer.Stop(); };
         }
 
+        private void AjustarLayoutBusquedaPorNombre()
+        {
+            const int margenHorizontal = 12;
+            const int top = 22;
+            const int separacion = 10;
+
+            label10.AutoSize = true;
+            label10.Location = new Point(margenHorizontal, top + 2);
+
+            NombreABuscar.Location = new Point(label10.Right + separacion, top);
+            var anchoDisponible = BuscarPorNombreBox.Width - NombreABuscar.Left - margenHorizontal;
+            NombreABuscar.Width = Math.Max(160, Math.Min(320, anchoDisponible));
+
+            ListaProductos.Location = new Point(margenHorizontal, NombreABuscar.Bottom + 10);
+            ListaProductos.Size = new Size(
+                Math.Max(200, BuscarPorNombreBox.Width - (margenHorizontal * 2)),
+                Math.Max(80, BuscarPorNombreBox.Height - ListaProductos.Top - 12));
+        }
+
         private static void EstilizarGrid(DataGridView grid)
         {
             grid.EnableHeadersVisualStyles = false;
@@ -152,13 +173,14 @@ namespace SistemaFerreteriaV8
         {
             KeyPreview = true;
             NombreABuscar.KeyDown += NombreABuscar_KeyDown;
-            Id.KeyDown += (_, e) =>
+            ADescontar.KeyDown += (_, e) =>
             {
-                if (e.KeyCode == Keys.Enter)
-                {
-                    e.SuppressKeyPress = true;
-                }
+                if (e.KeyCode != Keys.Enter) return;
+                e.SuppressKeyPress = true;
+                AsignarTotales();
             };
+            ADescontar.Leave += (_, _) => AsignarTotales();
+            FiltroDescuento.SelectedIndexChanged += (_, _) => AsignarTotales();
             KeyDown += (_, e) =>
             {
                 if (e.KeyCode != Keys.Escape) return;
@@ -256,12 +278,14 @@ namespace SistemaFerreteriaV8
             {
                 facturaActiva = new Factura
                 {
-                    Id = Factura.GenerarSiguienteId()
+                    Id = 0
                 };
             }
 
-            // Mostrar número de factura actual
-            NoFactura.Text = facturaActiva.Id > 0 ? facturaActiva.Id.ToString() : "Pendiente";
+            // Mostrar número estimado sin consumir secuencia al entrar a la ventana
+            NoFactura.Text = facturaActiva.Id > 0
+                ? facturaActiva.Id.ToString()
+                : Factura.GenerarSiguienteId().ToString();
         }
 
         #endregion
@@ -355,8 +379,6 @@ namespace SistemaFerreteriaV8
 
             // 3. Crear o actualizar factura
             int idFactura = facturaActiva?.Id ?? 0;
-            if (idFactura <= 0 && int.TryParse(NoFactura.Text, out var idTmp))
-                idFactura = idTmp;
 
             // IMPORTANTE:
             // Si la factura fue cargada para edición/reimpresión, nunca debe generar un nuevo ID.
@@ -375,19 +397,22 @@ namespace SistemaFerreteriaV8
             }
             else if (idFactura <= 0)
             {
+                // Se toma siempre el ID más alto real en facturas y se le suma 1.
                 idFactura = Factura.GenerarSiguienteId();
             }
 
             facturaActiva.Id = idFactura;
             NoFactura.Text = idFactura.ToString();
+            var customerId = (IdCliente.Text ?? string.Empty).Trim();
+            var rncDocumento = await ResolverDocumentoFiscalClienteAsync(customerId);
 
             var draft = AppServices.Sales.BuildInvoiceDraft(
                 preparation,
                 new InvoiceDraftMetadata(
                     InvoiceId: idFactura,
-                    CustomerId: IdCliente.Text,
+                    CustomerId: customerId,
                     CustomerName: NombreCliente.Text,
-                    Rnc: IdCliente.Text,
+                    Rnc: rncDocumento,
                     EmployeeId: empleado.Id.ToString(),
                     CompanyId: cajaActiva?.Id ?? "Empresa no definida",
                     InvoiceType: tipoFactura.Text,
@@ -408,6 +433,24 @@ namespace SistemaFerreteriaV8
 
             return workflow;
         }
+
+        private async Task<string> ResolverDocumentoFiscalClienteAsync(string customerId)
+        {
+            if (TieneOnceDigitos(customerId))
+                return SoloDigitos(customerId);
+
+            var cliente = await new Cliente().BuscarAsync(customerId);
+            if (cliente != null && TieneOnceDigitos(cliente.Cedula))
+                return SoloDigitos(cliente.Cedula);
+
+            return customerId;
+        }
+
+        private static bool TieneOnceDigitos(string? value)
+            => SoloDigitos(value).Length == 11;
+
+        private static string SoloDigitos(string? value)
+            => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
 
         // 2. AsignarTotales mantiene cálculos en UI thread
         public void AsignarTotales()
