@@ -22,6 +22,8 @@ namespace SistemaFerreteriaV8
         private TextBox txtColorPanel;
         private TextBox txtColorFondo;
         private DataGridView gridSecuencias;
+        private Label lblServidorSecundarias;
+        private TextBox txtServidorSecundarias;
         public VentanaConfiguraciones()
         {
             InitializeComponent();
@@ -29,6 +31,7 @@ namespace SistemaFerreteriaV8
             MinimumSize = new Size(1100, 720);
             InicializarSeccionTema();
             InicializarGridSecuencias();
+            InicializarSeccionServidorSecundarias();
             AplicarTemaVisualUniforme();
             OrganizarLayoutConfiguraciones();
             Resize += (_, __) => OrganizarLayoutConfiguraciones();
@@ -111,6 +114,30 @@ namespace SistemaFerreteriaV8
             groupBox4.Controls.Add(btnPrimario);
             groupBox4.Controls.Add(btnPanel);
             groupBox4.Controls.Add(btnFondo);
+        }
+
+        private void InicializarSeccionServidorSecundarias()
+        {
+            lblServidorSecundarias = new Label
+            {
+                Text = "Dirección para secundarias:",
+                ForeColor = Color.White,
+                Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
+                AutoSize = true
+            };
+
+            txtServidorSecundarias = new TextBox
+            {
+                ReadOnly = true,
+                BackColor = Color.FromArgb(243, 244, 246),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
+            };
+
+            groupBox4.Controls.Add(lblServidorSecundarias);
+            groupBox4.Controls.Add(txtServidorSecundarias);
+
+            Server.TextChanged += (_, __) => ActualizarDireccionSecundarias();
         }
         private void AplicarTemaVisualUniforme()
         {
@@ -228,6 +255,9 @@ namespace SistemaFerreteriaV8
             Server.Size = new Size(210, 25);
             button3.Location = new Point(370, 30);
             button3.Size = new Size(120, 34);
+            lblServidorSecundarias.Location = new Point(18, 72);
+            txtServidorSecundarias.Location = new Point(18, 96);
+            txtServidorSecundarias.Size = new Size(groupBox4.Width - 36, 24);
             comboBoxImpresoras.Location = new Point(213, 75);
             comboBoxImpresoras.Size = new Size(277, 25);
             comboBox1.Location = new Point(160, 112);
@@ -440,6 +470,7 @@ namespace SistemaFerreteriaV8
         private void button3_Click(object sender, EventArgs e)
         {
             Server.Text = "";
+            ActualizarDireccionSecundarias();
         }
         private async void VentanaConfiguraciones_Load(object sender, EventArgs e)
         {
@@ -483,6 +514,7 @@ namespace SistemaFerreteriaV8
                 AplicarPreviewColor(txtColorPrimario);
                 AplicarPreviewColor(txtColorPanel);
                 AplicarPreviewColor(txtColorFondo);
+                ActualizarDireccionSecundarias();
 
                 if (config.Icono != null)
                 {
@@ -539,6 +571,37 @@ namespace SistemaFerreteriaV8
                 }         
 
             }
+        }
+
+        private void ActualizarDireccionSecundarias()
+        {
+            var host = (Server.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(host))
+                host = ExtraerHostDesdeUri(new OneKeys().URI);
+
+            if (string.IsNullOrWhiteSpace(host))
+                host = "localhost";
+
+            txtServidorSecundarias.Text = $"mongodb://{host}:27017/";
+        }
+
+        private static string ExtraerHostDesdeUri(string uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+                return string.Empty;
+
+            var limpio = uri.Trim();
+            if (limpio.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+                limpio = limpio.Substring("mongodb://".Length);
+
+            var slash = limpio.IndexOf('/');
+            if (slash >= 0)
+                limpio = limpio.Substring(0, slash);
+
+            if (limpio.Contains(':'))
+                limpio = limpio.Split(':')[0];
+
+            return limpio;
         }
         private void CargarGridSecuenciasDesdeConfiguracion(Configuraciones config)
         {
