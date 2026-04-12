@@ -17,7 +17,7 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
         try
         {
-            var mapResult = await BuildPersistableListProductsAsync(request.Draft.Lines, request.ApplyStockMovement, operationId);
+            var mapResult = await BuildPersistableListProductsAsync(request.Draft.Lines, operationId);
             if (!mapResult.Success)
             {
                 await WriteAuditAsync(
@@ -210,7 +210,6 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
     private static async Task<(bool Success, string Message, List<ListProduct> Products)> BuildPersistableListProductsAsync(
         IReadOnlyCollection<InvoiceDraftLine> lines,
-        bool validateStock,
         string operationId)
     {
         var result = new List<ListProduct>();
@@ -233,18 +232,10 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
                 if (!string.IsNullOrWhiteSpace(line.ProductId))
                 {
                     lookup = await AppServices.Product.FindByIdAsync(line.ProductId);
-                    if (validateStock)
-                    {
-                        var stock = await AppServices.Product.CheckStockAsync(line.ProductId, line.Quantity);
-                        if (!stock.Success)
-                            return (false, $"{stock.Message} '{line.ProductName}' (op={operationId}).", result);
-                    }
                 }
                 else
                 {
                     lookup = await AppServices.Product.FindByNameAsync(line.ProductName);
-                    if (validateStock && lookup.Product != null && lookup.Product.Cantidad < line.Quantity)
-                        return (false, $"Stock insuficiente para '{line.ProductName}' al mapear líneas persistibles (op={operationId}).", result);
                 }
 
                 if (!lookup.Found || lookup.Product == null)
