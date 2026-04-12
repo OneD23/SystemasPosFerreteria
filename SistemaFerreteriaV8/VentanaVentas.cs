@@ -1,0 +1,1485 @@
+﻿
+using Microsoft.VisualBasic;
+using Octetus.ConsultasDgii.Services;
+using SistemaFerreteriaV8.Clases;
+using SistemaFerreteriaV8.Domain.Security;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using static Org.BouncyCastle.Math.EC.ECCurve;
+using SistemaFerreteriaV8.Infrastructure.Security;
+using SistemaFerreteriaV8.Infrastructure.Services;
+using SistemaFerreteriaV8.AppCore.Sales;
+using SistemaFerreteriaV8.AppCore.Abstractions;
+
+namespace SistemaFerreteriaV8
+{
+    public partial class VentanaVentas : Form
+    {
+        public Empleado empleado { get; set; }
+
+        public string codigoProducto = string.Empty;
+        Productos productoActivo = null;
+        Factura facturaActiva { get; set; }
+        double totalActivo = 0;
+        double descuentoActivo = 0;
+        public bool esCargada = false;
+        private readonly System.Windows.Forms.Timer statusTimer = new System.Windows.Forms.Timer { Interval = 3500 };
+        private readonly System.Windows.Forms.Timer _searchDebounceTimer = new System.Windows.Forms.Timer { Interval = 180 };
+        private int _searchRequestVersion;
+
+
+        public VentanaVentas()
+        {
+            InitializeComponent();
+            SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
+            AjustarAlineacionVisual();
+            ModernizarControlesVenta();
+            WireFastCheckoutEvents();
+            _searchDebounceTimer.Tick += async (_, _) => await EjecutarBusquedaProductosAsync();
+        }
+        private void AjustarAlineacionVisual()
+        {
+            // --- Informe de Facturación ---
+            int xLabelInfo = 20;
+            int wLabelInfo = 170;
+            int xInputInfo = 210;
+
+            foreach (var lbl in new[] { label1, label3, label2 })
+            {
+                lbl.AutoSize = false;
+                lbl.TextAlign = ContentAlignment.MiddleRight;
+                lbl.Location = new Point(xLabelInfo, lbl.Location.Y);
+                lbl.Size = new Size(wLabelInfo, 24);
+            }
+
+            IdCliente.Location = new Point(xInputInfo, IdCliente.Location.Y);
+            NombreCliente.Location = new Point(xInputInfo, NombreCliente.Location.Y);
+            tipoFactura.Location = new Point(xInputInfo, tipoFactura.Location.Y);
+
+            // Bloque Fecha/Hora/No. Factura (lado derecho)
+            int xLabelFecha = 500;
+            int wLabelFecha = 120;
+            int xValorFecha = 630;
+            foreach (var lbl in new[] { label5, label6, label4 })
+            {
+                lbl.AutoSize = false;
+                lbl.TextAlign = ContentAlignment.MiddleRight;
+                lbl.Location = new Point(xLabelFecha, lbl.Location.Y);
+                lbl.Size = new Size(wLabelFecha, 24);
+            }
+
+            foreach (var valor in new[] { Fecha, Hora, NoFactura })
+            {
+                valor.AutoSize = false;
+                valor.Location = new Point(xValorFecha, valor.Location.Y);
+                valor.Size = new Size(130, 24);
+                valor.TextAlign = ContentAlignment.MiddleLeft;
+            }
+
+            // --- Opciones: Dirección / Nota ---
+            int xLabelOpc = 20;
+            int wLabelOpc = 95;
+            int xInputOpc = 130;
+
+            foreach (var lbl in new[] { label11, label12 })
+            {
+                lbl.AutoSize = false;
+                lbl.TextAlign = ContentAlignment.MiddleRight;
+                lbl.Location = new Point(xLabelOpc, lbl.Location.Y);
+                lbl.Size = new Size(wLabelOpc, 24);
+            }
+
+            direccion.Location = new Point(xInputOpc, direccion.Location.Y);
+            descripcion.Location = new Point(xInputOpc, descripcion.Location.Y);
+            direccion.Width = groupBox3.Width - xInputOpc - 12;
+            descripcion.Width = groupBox3.Width - xInputOpc - 12;
+
+            // --- Panel de Totales ---
+            int xLabelTotales = 15;
+            int wLabelTotales = 185;
+            int xValorTotales = 210;
+            foreach (var lbl in new[] { label7, label8, label13, label9 })
+            {
+                lbl.AutoSize = false;
+                lbl.TextAlign = ContentAlignment.MiddleRight;
+                lbl.Location = new Point(xLabelTotales, lbl.Location.Y);
+                lbl.Size = new Size(wLabelTotales, 24);
+            }
+
+            SubTotal.Location = new Point(xValorTotales, SubTotal.Location.Y);
+            Descuento.Location = new Point(xValorTotales, Descuento.Location.Y);
+            Total.Location = new Point(xValorTotales, Total.Location.Y);
+            FiltroDescuento.Location = new Point(xValorTotales, FiltroDescuento.Location.Y);
+            ADescontar.Location = new Point(xValorTotales + 50, ADescontar.Location.Y);
+            ADescontar.Width = 120;
+        }
+
+        private void ModernizarControlesVenta()
+        {
+            UiConsistencia.AplicarFormularioBase(this);
+            UiConsistencia.AplicarBotonExito(Cobrar);
+            UiConsistencia.AplicarBotonAccion(VentaRapida);
+            UiConsistencia.AplicarBotonPeligro(Cancelar);
+            UiConsistencia.AplicarBotonPrimario(Guardar);
+
+            EstilizarGrid(ListaDeCompras);
+            EstilizarGrid(ListaProductos);
+
+            Aviso.Visible = false;
+            statusTimer.Tick += (_, _) => { Aviso.Visible = false; statusTimer.Stop(); };
+        }
+
+        private static void EstilizarGrid(DataGridView grid)
+        {
+            grid.EnableHeadersVisualStyles = false;
+            grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(30, 41, 59);
+            grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            grid.DefaultCellStyle.BackColor = Color.White;
+            grid.DefaultCellStyle.ForeColor = Color.FromArgb(15, 23, 42);
+            grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(219, 234, 254);
+            grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(15, 23, 42);
+            grid.RowTemplate.Height = Math.Max(grid.RowTemplate.Height, 26);
+            grid.GridColor = Color.FromArgb(226, 232, 240);
+        }
+
+        private void WireFastCheckoutEvents()
+        {
+            KeyPreview = true;
+            NombreABuscar.KeyDown += NombreABuscar_KeyDown;
+            Id.KeyDown += (_, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.SuppressKeyPress = true;
+                }
+            };
+            KeyDown += (_, e) =>
+            {
+                if (e.KeyCode != Keys.Escape) return;
+                if (BuscarPorNombreBox.Visible)
+                {
+                    BuscarPorNombreBox.Visible = false;
+                    NombreABuscar.Clear();
+                    ListaProductos.Rows.Clear();
+                    Id.Focus();
+                    e.SuppressKeyPress = true;
+                }
+            };
+        }
+
+        private async void NombreABuscar_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode != Keys.Enter) return;
+            e.SuppressKeyPress = true;
+
+            if (ListaProductos.Rows.Count == 0)
+            {
+                MostrarEstado("No se encontraron productos para el filtro actual.", true);
+                return;
+            }
+
+            await AgregarPrimerProductoFiltradoAsync();
+        }
+
+        private async Task AgregarPrimerProductoFiltradoAsync()
+        {
+            var firstRow = ListaProductos.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => r.Cells[0]?.Value != null);
+            if (firstRow == null) return;
+
+            var id = firstRow.Cells[0].Value?.ToString();
+            if (string.IsNullOrWhiteSpace(id)) return;
+            var nombre = firstRow.Cells[1].Value?.ToString() ?? id;
+
+            codigoProducto = id;
+            await DetectaProductoAsync();
+            AsignarTotales();
+            NombreABuscar.Clear();
+            ListaProductos.Rows.Clear();
+            Id.Focus();
+            MostrarEstado($"Producto '{nombre}' agregado.", false);
+        }
+
+        private void MostrarEstado(string message, bool isError)
+        {
+            UiConsistencia.MostrarEstado(Aviso, message, isError);
+            statusTimer.Stop();
+            statusTimer.Start();
+        }
+
+        #region Limpieza del Formulario
+
+        /// <summary>
+        /// Limpia todos los campos de la ventana de ventas y reinicia el estado.
+        /// </summary>
+        /// <param name="resetCliente">
+        /// Si es true, también resetea los campos de cliente; si false, solo limpia la lista de compras.
+        /// </param>
+        public void LimpiarTodo(bool resetCliente = true)
+        {
+            // Fechas y horas
+            Fecha.Text = DateTime.Now.ToShortDateString();
+            Hora.Text = DateTime.Now.ToShortTimeString();
+
+            // Campos de cliente
+            if (resetCliente)
+            {
+                IdCliente.Text = "0";
+                NombreCliente.Text = "Generico";
+            }
+
+            // Lista de productos
+            ListaDeCompras.Rows.Clear();
+
+            // Totales y descuentos
+            totalActivo = 0;
+            descuentoActivo = 0;
+            SubTotal.Text = Total.Text = ADescontar.Text = string.Empty;
+
+            // Otros campos
+            direccion.Text = descripcion.Text = string.Empty;
+            N.Checked = false;
+            esCargada = false;
+            BuscarPorNombreBox.Visible = false;
+
+            // Tipo de factura desde configuración
+            var config = new Configuraciones().ObtenerPorId(1);
+            tipoFactura.Text = config?.Seleccion ?? "0";
+
+            // Inicializar factura activa para evitar NullReference al guardar/seleccionar productos
+            if (resetCliente || facturaActiva == null)
+            {
+                facturaActiva = new Factura
+                {
+                    Id = Factura.GenerarSiguienteId()
+                };
+            }
+
+            // Mostrar número de factura actual
+            NoFactura.Text = facturaActiva.Id > 0 ? facturaActiva.Id.ToString() : "Pendiente";
+        }
+
+        #endregion
+
+        #region Carga de Factura para Edición
+
+        /// <summary>
+        /// Carga los datos de una factura existente en la UI para edición.
+        /// </summary>
+        /// <param name="factura">Instancia de la factura a cargar.</param>
+        public async Task CargarFacturaAsync(Factura factura)
+        {
+            if (factura == null) return;
+
+            bool puedeEditar = empleado?.Puesto == "Administrador";
+            if (!puedeEditar)
+            {
+                puedeEditar = await PermissionAccess.EnsurePermissionAsync(
+                    empleado,
+                    AppPermissions.VentasCancelar,
+                    this,
+                    "editar una factura");
+            }
+
+            if (!puedeEditar)
+            {
+                MessageBox.Show("Acceso denegado. Solo Administrador puede editar.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (factura.Eliminada)
+            {
+                MessageBox.Show("La factura ya fue eliminada.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Asignar datos de la factura a los controles
+            facturaActiva = factura;
+            LimpiarTodo(resetCliente: false);
+
+            NombreCliente.Text = factura.NombreCliente;
+            IdCliente.Text = string.IsNullOrWhiteSpace(factura.IdCliente) || factura.IdCliente == "0"
+                ? factura.RNC
+                : factura.IdCliente;
+
+            tipoFactura.Text = factura.TipoFactura;
+            Fecha.Text = factura.Fecha.ToShortDateString();
+            Hora.Text = factura.Fecha.ToShortTimeString();
+            NoFactura.Text = factura.Id.ToString();
+            SubTotal.Text = (factura.Total - factura.Descuentos).ToString("C2");
+            ADescontar.Text = factura.Descuentos.ToString("C2");
+            Total.Text = factura.Total.ToString("C2");
+            direccion.Text = factura.Direccion;
+            descripcion.Text = factura.Description;
+            N.Checked = factura.Enviar;
+            totalActivo = factura.Total;
+
+            // Cargar productos
+            ListaDeCompras.Rows.Clear();
+            if (factura.Productos != null)
+            {
+                foreach (var item in factura.Productos)
+                {
+                    ListaDeCompras.Rows.Add(
+                        item.Producto.Nombre,
+                        item.Producto.Descripcion,
+                        item.Producto.Marca,
+                        item.Precio,
+                        item.Cantidad,
+                        item.Cantidad * item.Precio
+                    );
+                }
+            }
+
+            facturaActiva.Editada = true;
+            esCargada = true; // Evita volver a registrar inventario al guardar/venta rápida una factura ya existente.
+            // Actualiza los cambios de la factura en la BD
+            await facturaActiva.ActualizarFacturaAsync();
+        }
+
+        #endregion
+
+
+        // 1. RegistrarFactura ahora como async Task, usando métodos async y evitando async void.
+        public async Task<SalesWorkflowResult> RegistrarFacturaAsync(bool paga, SalePreparationResult preparation, bool isQuotation = false)
+        {
+            if (facturaActiva == null) return new SalesWorkflowResult(false, "No hay factura activa.");
+
+            // 2. Obtener caja activa de forma asíncrona
+            var cajaActiva = await  Caja.BuscarPorClaveAsync("estado", "true");
+
+            // 3. Crear o actualizar factura
+            int idFactura = facturaActiva?.Id ?? 0;
+            if (idFactura <= 0 && int.TryParse(NoFactura.Text, out var idTmp))
+                idFactura = idTmp;
+
+            // IMPORTANTE:
+            // Si la factura fue cargada para edición/reimpresión, nunca debe generar un nuevo ID.
+            // Así evitamos que al reimprimir se incremente la secuencia de facturas.
+            if (esCargada)
+            {
+                if (idFactura <= 0)
+                {
+                    MessageBox.Show(
+                        "No se pudo determinar el ID de la factura cargada. Vuelva a abrir la factura antes de reimprimir.",
+                        "Aviso",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return new SalesWorkflowResult(false, "ID de factura inválido para factura cargada.");
+                }
+            }
+            else if (idFactura <= 0)
+            {
+                idFactura = Factura.GenerarSiguienteId();
+            }
+
+            facturaActiva.Id = idFactura;
+            NoFactura.Text = idFactura.ToString();
+
+            var draft = AppServices.Sales.BuildInvoiceDraft(
+                preparation,
+                new InvoiceDraftMetadata(
+                    InvoiceId: idFactura,
+                    CustomerId: IdCliente.Text,
+                    CustomerName: NombreCliente.Text,
+                    Rnc: IdCliente.Text,
+                    EmployeeId: empleado.Id.ToString(),
+                    CompanyId: cajaActiva?.Id ?? "Empresa no definida",
+                    InvoiceType: tipoFactura.Text,
+                    Description: descripcion.Text,
+                    Address: direccion.Text.Trim(),
+                    SendByDelivery: N.Checked,
+                    Paid: paga,
+                    CreatedAt: DateTime.Now));
+
+            var workflow = await AppServices.SalesWorkflow.ConfirmSaleAsync(new SalesWorkflowRequest(
+                Draft: draft,
+                ApplyStockMovement: !esCargada,
+                InvoiceType: tipoFactura.Text,
+                IsQuotation: isQuotation));
+
+            if (workflow.Success && workflow.PersistedInvoice != null)
+                facturaActiva = workflow.PersistedInvoice;
+
+            return workflow;
+        }
+
+        // 2. AsignarTotales mantiene cálculos en UI thread
+        public void AsignarTotales()
+        {
+            var lines = ListaDeCompras.Rows
+                .Cast<DataGridViewRow>()
+                .Where(r => r.Cells[4]?.Value != null && r.Cells[3]?.Value != null)
+                .Select(r =>
+                {
+                    var productName = r.Cells[0]?.Value?.ToString() ?? "SinNombre";
+                    double.TryParse(r.Cells[4].Value?.ToString(), out var qty);
+                    double.TryParse(r.Cells[3].Value?.ToString(), out var price);
+                    return new SaleLineInput(
+                        ProductId: string.Empty,
+                        ProductName: productName,
+                        Quantity: qty,
+                        UnitPrice: price,
+                        AvailableStock: double.MaxValue,
+                        ProductFound: true,
+                        IsGeneric: productName.Equals("Generico", StringComparison.OrdinalIgnoreCase));
+                })
+                .ToList();
+
+            var totals = AppServices.Sales.CalculateTotals(
+                lines,
+                ADescontar.Text,
+                FiltroDescuento.SelectedIndex == 0);
+
+            ApplyTotals(totals);
+        }
+
+        // 3. ActualizarTotalesUI simplificado
+        private void ActualizarTotalesUI(double subtotal)
+        {
+            SubTotal.Text = subtotal.ToString("C2");
+            Descuento.Text = descuentoActivo.ToString("C2");
+            Total.Text = (subtotal - descuentoActivo).ToString("C2");
+        }
+
+        private void ApplyTotals(SalesTotals totals)
+        {
+            totalActivo = totals.Subtotal;
+            descuentoActivo = totals.Discount;
+            SubTotal.Text = totals.Subtotal.ToString("C2");
+            Descuento.Text = totals.Discount.ToString("C2");
+            Total.Text = totals.Total.ToString("C2");
+        }
+
+        private async Task<SalePreparationResult> BuildSalePreparationAsync()
+        {
+            var lines = new List<SaleLineInput>();
+
+            foreach (DataGridViewRow row in ListaDeCompras.Rows)
+            {
+                var productName = row.Cells[0]?.Value?.ToString();
+                if (string.IsNullOrWhiteSpace(productName))
+                    continue;
+
+                double.TryParse(row.Cells[4]?.Value?.ToString(), out var qty);
+                double.TryParse(row.Cells[3]?.Value?.ToString(), out var price);
+
+                var isGeneric = productName.Equals("Generico", StringComparison.OrdinalIgnoreCase);
+                double stock = double.MaxValue;
+                bool found = true;
+                string productId = string.Empty;
+
+                if (!isGeneric)
+                {
+                    var lookup = await AppServices.Product.FindByNameAsync(productName);
+                    found = lookup.Found && lookup.Product != null;
+                    stock = lookup.Product?.Cantidad ?? 0;
+                    productId = lookup.Product?.Id ?? string.Empty;
+                }
+
+                lines.Add(new SaleLineInput(
+                    ProductId: productId,
+                    ProductName: productName,
+                    Quantity: qty,
+                    UnitPrice: price,
+                    AvailableStock: stock,
+                    ProductFound: found,
+                    IsGeneric: isGeneric));
+            }
+
+            return AppServices.Sales.PrepareSale(new SalePreparationRequest(
+                lines,
+                ADescontar.Text,
+                FiltroDescuento.SelectedIndex == 0));
+        }
+
+        // 4. DetectaProducto ahora async Task (si necesitas buscar en BD async)
+        public async Task DetectaProductoAsync()
+        {
+            string codigo = string.IsNullOrWhiteSpace(this.codigoProducto) ? "0" : this.codigoProducto;
+            Productos producto = null;
+            if (codigo == "0000")
+            {
+                double precioGen = ObtenerPrecioGenerico();
+                if (precioGen > 0)
+                {
+                    producto = new Productos { Nombre = "Generico", Precio = new List<double> { precioGen, precioGen, precioGen, precioGen } };
+                    await producto.ActualizarProductosAsync();
+                }
+            }
+            else
+            {
+                var lookup = await AppServices.Product.FindByIdAsync(codigo);
+                producto = lookup.Product;
+            }
+
+            if (producto != null)
+            {
+                VerificarStock(producto);
+                ActualizarListaDeCompras(producto);
+            }
+            else
+            {
+                MessageBox.Show($"Producto no encontrado: {codigo}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            codigoProducto = string.Empty;
+        }
+        public void CambiarPrecio(string valor)
+        {
+            int y = ListaDeCompras.CurrentRow.Index;
+            double cantidad = double.Parse(obtenerValorDeCelda(ListaDeCompras[4, y]));
+            double precio = double.Parse(valor);
+
+            ListaDeCompras[3, y].Value = valor;
+            ListaDeCompras[5, y].Value = (cantidad * precio).ToString();
+
+        }
+        public string obtenerValorDeCelda(DataGridViewCell celda)
+        {
+            string valor = "";
+            if (celda != null && celda.Value != null && celda.Value.ToString() != null)
+            {
+                valor = !string.IsNullOrWhiteSpace(celda.Value.ToString()) ? celda.Value.ToString() : "";
+            }
+            return valor;
+        }
+        // 5. ObtenerPrecioGenerico sin cambios (puede ser sync)
+        private double ObtenerPrecioGenerico()
+        {
+            string input = Interaction.InputBox("Este artículo es genérico. Ingrese el precio:");
+            if (double.TryParse(input, out var precio) && precio > 0) return precio;
+            MessageBox.Show("Precio inválido.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return -1;
+        }
+
+        // 6. VerificarStock queda igual
+        private void VerificarStock(Productos producto)
+        {
+            if (producto.Cantidad < 1)
+                MessageBox.Show($"Agotado: {producto.Nombre}", "Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else if (producto.Cantidad < 3)
+                MessageBox.Show($"Poco stock ({producto.Cantidad}) de {producto.Nombre}", "Stock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+
+        // Método auxiliar: Actualizar la lista de compras
+        #region Actualizar Lista de Compras
+
+        /// <summary>
+        /// Agrega un producto al DataGridView de compras o incrementa su cantidad si ya existe.
+        /// Luego recalcula totales.
+        /// </summary>
+        private void ActualizarListaDeCompras(Productos producto)
+{
+    // Busca la fila existente por nombre de producto
+    var filaExistente = ListaDeCompras.Rows
+        .Cast<DataGridViewRow>()
+        .FirstOrDefault(r => (r.Cells["Nombre"].Value?.ToString() ?? "") == producto.Nombre);
+
+    // Obtiene el precio actual según la configuración
+    double precioBase = producto.Nombre != "Generico"
+        ? ObtenerPrecioProducto(producto)
+        : producto.Precio[0];
+
+    if (filaExistente == null)
+    {
+        // Añade nueva fila: Nombre | Descripción | Marca | Precio Unitario | Cantidad | Subtotal
+        int rowIndex = ListaDeCompras.Rows.Add(
+            producto.Nombre,
+            producto.Descripcion,
+            producto.Marca,
+            precioBase.ToString("0.00"),
+            1,
+            precioBase.ToString("0.00")
+        );
+        // Opcional: guarda el objeto de producto en Tag para futuras referencias
+        ListaDeCompras.Rows[rowIndex].Tag = producto;
+    }
+    else
+    {
+        // Incrementa cantidad y actualiza sub-total
+        int cantidad = Convert.ToInt32(filaExistente.Cells["Cantidad"].Value) + 1;
+        filaExistente.Cells["Cantidad"].Value = cantidad;
+        filaExistente.Cells["SubTotal1"].Value = (cantidad * precioBase).ToString("0.00");
+    }
+
+    // Actualiza totales de la venta
+    AsignarTotales();
+}
+
+/// <summary>
+/// Obtiene el precio unitario del producto según la selección en Configuraciones.
+/// </summary>
+private double ObtenerPrecioProducto(Productos producto)
+{
+    // Carga perezosa de configuración
+    var config = new Configuraciones().ObtenerPorId(1);
+    int indicePrecio = config?.Precio ?? 0;
+
+    // Valida que el índice exista en la lista de precios
+    if (indicePrecio < 0 || indicePrecio >= producto.Precio.Count)
+        return producto.Precio.First(); // precio por defecto
+
+    return producto.Precio[indicePrecio];
+}
+
+#endregion
+
+#region Botón Limpiar Todo
+
+/// <summary>
+/// Evento del botón 10: limpia todo el formulario de ventas.
+/// Mantiene intactos los datos de configuración y estado del empleado.
+/// </summary>
+private void button10_Click(object sender, EventArgs e)
+{
+    // (Opcional) Si quieres revertir cambios en stock o marcar algo en facturaActiva, hazlo aquí.
+    LimpiarTodo();
+}
+
+#endregion
+
+        private void GlobalKeyListener_KeyPressed(object sender, KeyEventArgs e)
+        {
+            switch (e.KeyCode)
+            {
+                case Keys.F5:
+                    button18_Click(sender, e);
+                    break;
+                case Keys.F4:
+                    button1_Click(sender, e);
+                    break;
+                case Keys.F10:
+                    Cobrar_Click(sender, e);
+                    break;
+                case Keys.F11:
+                    Eliminar_Click(sender, e);
+                    break;
+                case Keys.F12:
+                    button3_Click(sender, e);
+                    break;
+            }
+        }
+        private void button3_Click(object sender, EventArgs e)
+        {
+            new ListaDeEnvios().Show();
+        }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+
+            if (!esCargada)
+            {
+                Hora.Text = DateTime.Now.ToShortTimeString();
+                if (facturaActiva != null)
+                    NoFactura.Text = facturaActiva.Id.ToString();
+            }
+        }
+        private void Eliminar_Click(object sender, EventArgs e)
+        {
+            if (ListaDeCompras.RowCount > 1)
+            {
+                try
+                {
+
+                    ListaDeCompras.Rows.RemoveAt(ListaDeCompras.CurrentRow.Index);
+                }
+                catch (Exception)
+                {
+
+
+                }
+                finally
+                {
+                    AsignarTotales();
+                }
+            }
+        }
+        /// <summary>
+        /// Al terminar de editar una celda de cantidad o precio, actualiza el subtotal y recalcula totales.
+        /// </summary>
+        private void ListaDeCompras_CellEndEdit(object sender, DataGridViewCellEventArgs e)
+        {
+            // Asegurarse de que estamos en una fila válida
+            if (e.RowIndex < 0) return;
+
+            var row = ListaDeCompras.Rows[e.RowIndex];
+
+            // Obtener valores de cantidad y precio de forma segura
+            if (row.Cells[4].Value != null
+                && row.Cells[3].Value != null
+                && double.TryParse(row.Cells[4].Value.ToString(), out double cantidad)
+                && double.TryParse(row.Cells[3].Value.ToString(), out double precio))
+            {
+                // Actualizar SubTotal (columna índice 5)
+                double subtotal = cantidad * precio;
+                row.Cells[5].Value = subtotal.ToString("0.00");
+
+                // Recalcular el total general
+                AsignarTotales();
+            }
+        }
+
+        /// <summary>
+        /// Al hacer doble clic en la columna de precio (índice 3), abre la ventana de cambio de precio.
+        /// </summary>
+        private async void ListaDeCompras_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // Validar índice de fila y columna
+            if (e.RowIndex < 0 || e.ColumnIndex != 3) return;
+
+            // Obtener el nombre del producto de la columna 0
+            string nombre = ListaDeCompras.Rows[e.RowIndex].Cells[0].Value?.ToString() ?? "";
+            if (string.IsNullOrEmpty(nombre)) return;
+
+            // Buscar el producto de forma asíncrona
+            var lookupPrecio = await AppServices.Product.FindByNameAsync(nombre);
+            var producto = lookupPrecio.Product;
+            if (producto == null) return;
+
+            // Abrir la ventana de precio con el producto encontrado
+            var ventana = new VentanaPrecio
+            {
+                dataGridView = ListaDeCompras,
+                ProductoSeleccionado = producto
+            };
+            ventana.ShowDialog();
+
+            // Recalcular totales después de cualquier cambio de precio
+            AsignarTotales();
+        }
+
+        /// <summary>
+        /// Captura el código del producto a medida que se teclean caracteres
+        /// y al presionar Enter dispara la detección y agrega el producto.
+        /// </summary>
+        private async void Id_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            // Si es Enter, procesar el código acumulado
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                e.Handled = true; // Evita el "ding" del sistema
+
+                // Ejecuta la detección de producto de forma asincrónica si tu método lo soporta
+                await DetectaProductoAsync();
+
+                // Limpia el buffer y el TextBox
+                codigoProducto = string.Empty;
+                Id.Clear();
+            }
+            else if (!char.IsControl(e.KeyChar))
+            {
+                // Acumula solo caracteres imprimibles
+                codigoProducto += e.KeyChar;
+            }
+        }
+
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            new VentanaFacturasPorCobrar().ShowDialog();
+        }
+
+        // Requiere:
+        // using System.Threading.Tasks;
+        // using SistemaFerreteriaV8.Clases;
+
+        private async void IdCliente_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar != (char)Keys.Enter) return;
+
+            string textoRnc = IdCliente.Text.Trim();
+            if (string.IsNullOrEmpty(textoRnc))
+            {
+                Id.Focus();
+                return;
+            }
+
+            // 1) Intentar buscar cliente en MongoDB de forma asíncrona
+            Cliente cliente = await new Cliente().BuscarAsync(textoRnc);
+            if (cliente != null)
+            {
+                NombreCliente.Text = cliente.Nombre;
+                direccion.Text = cliente.Direccion;
+            }
+            else
+            {
+                // 2) Cliente no existe: consultar DGII en segundo plano
+                string NombreEncontrado = "", RNCEncontrado = "";
+                var dgii = new ServicioConsultasWebDgii();
+
+                // Llamada a DGII (bloqueante) en Task.Run para no congelar UI
+                var response = await Task.Run(() => dgii.ConsultarRncRegistrados(textoRnc));
+                if (response.Success)
+                {
+                    MessageBox.Show(
+                        $"RNC: {response.RncOCedula}\n" +
+                        $"Nombre/Razón Social: {response.Nombre}\n" +
+                        $"Tipo: {response.Tipo}\n" +
+                        $"Actividad: {response.Actividad}\n" +
+                        $"Estado: {response.Estado}",
+                        "RNC Registrado",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information
+                    );
+                    NombreEncontrado = response.Nombre;
+                    RNCEncontrado = response.RncOCedula;
+                }
+                else
+                {
+                    var response2 = await Task.Run(() => dgii.ConsultarRncContribuyentes(textoRnc));
+                    if (response2.Success)
+                    {
+                        MessageBox.Show(
+                            $"RNC: {response2.CedulaORnc}\n" +
+                            $"Nombre/Razón Social: {response2.NombreORazónSocial}\n" +
+                            $"Nombre Comercial: {response2.NombreComercial}\n" +
+                            $"Categoría: {response2.Categoría}\n" +
+                            $"Actividad Económica: {response2.ActividadEconomica}\n" +
+                            $"Estado: {response2.Estado}",
+                            "Contribuyente",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information
+                        );
+                        NombreEncontrado = response2.NombreORazónSocial;
+                        RNCEncontrado = response2.CedulaORnc;
+                    }
+                    else
+                    {
+                        // 3) Buscar en archivo local rnc.txt
+                        PanelDeCarga.Visible = true;
+                        await Task.Run(() => RncSearcher.DownloadAndExtractAsync(BarraDeCarga, Carga));
+                        var resultado = await Task.Run(() => RncSearcher.SearchRNC(textoRnc));
+                        PanelDeCarga.Visible = false;
+
+                        if (resultado != null)
+                        {
+                            NombreEncontrado = resultado.Nombre; // Ajusta según estructura de RncRecord
+                            RNCEncontrado = resultado.RNC;
+                        }
+                        else
+                        {
+                            MessageBox.Show("RNC no encontrado.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    }
+                }
+
+                // 4) Actualizar o insertar la factura activa con los datos del RNC
+                if (!string.IsNullOrEmpty(RNCEncontrado))
+                {
+                    if (facturaActiva != null)
+                    {
+                        facturaActiva.RNC = RNCEncontrado;
+                        facturaActiva.NombreCliente = NombreEncontrado;
+                        NombreCliente.Text = NombreEncontrado;
+                        direccion.Text = direccion.Text; // conservar dirección actual
+                        await facturaActiva.ActualizarFacturaAsync();
+                    }
+                    else
+                    {
+                        facturaActiva = new Factura { RNC = RNCEncontrado, NombreCliente = NombreEncontrado };
+                        NombreCliente.Text = NombreEncontrado;
+                        await facturaActiva.InsertarFacturaAsync();
+                    }
+                }
+            }
+
+            Id.Focus();
+        }
+
+        private async void VentanaVentas_Load(object sender, EventArgs e)
+        {
+            // Inicialización UI
+            FiltroDescuento.SelectedIndex = 0;
+            GlobalKeyListener.KeyPressed += GlobalKeyListener_KeyPressed;
+
+            // Carga ASINCRÓNICA de la lista de clientes para no bloquear la UI
+            List<Cliente> clientes;
+            try
+            {
+                clientes = await new Cliente().ListarAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar clientes: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                clientes = new List<Cliente>();
+            }
+
+            // Preparar AutoComplete
+            var nombres = clientes.Select(c => c.Nombre).ToArray();
+            var autoCompleteCollection = new AutoCompleteStringCollection();
+            autoCompleteCollection.AddRange(nombres);
+            NombreCliente.AutoCompleteCustomSource = autoCompleteCollection;
+
+            // Resto de inicialización
+            IdCliente.Text = "0";
+            NombreCliente.Text = "Generico";
+            Id.Focus();
+            LimpiarTodo();
+
+            bool tieneAcceso = empleado.Puesto == "Administrador" || empleado.Puesto == "Cajera";
+            VentaRapida.Enabled = tieneAcceso;
+            Cobrar.Enabled = tieneAcceso;
+        }
+
+        #region Botones de cantidad y búsqueda
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            // Alterna visibilidad y limpia la búsqueda
+            BuscarPorNombreBox.Visible = !BuscarPorNombreBox.Visible;
+            NombreABuscar.Clear();
+            ListaProductos.Rows.Clear();
+            NombreABuscar.Focus();
+        }
+
+        private async void button13_Click(object sender, EventArgs e)
+        {
+            var permitido = await PermissionAccess.EnsurePermissionAsync(
+                empleado,
+                AppPermissions.VentasDescuento,
+                this,
+                "aplicar descuentos");
+            if (!permitido) return;
+
+            // Disminuye la cantidad del producto seleccionado
+            var row = ListaDeCompras.CurrentRow;
+            if (row == null) return;
+
+            if (double.TryParse(row.Cells[4].Value?.ToString(), out var cantidad) &&
+                double.TryParse(row.Cells[3].Value?.ToString(), out var precio))
+            {
+                cantidad = Math.Max(0, cantidad - 1);
+                row.Cells[4].Value = cantidad;
+                row.Cells[5].Value = (cantidad * precio).ToString("0.00");
+
+                // Ajusta totales internos
+                totalActivo = Math.Max(0, totalActivo - precio);
+                descuentoActivo = Math.Max(0, descuentoActivo - precio * (productoActivo!= null ?productoActivo.Descuento:1));
+                AsignarTotales();
+            }
+        }
+
+        private async void button15_Click(object sender, EventArgs e)
+        {
+            var permitido = await PermissionAccess.EnsurePermissionAsync(
+                empleado,
+                AppPermissions.VentasDescuento,
+                this,
+                "modificar descuento/cantidad");
+            if (!permitido) return;
+
+            // Aumenta la cantidad del producto seleccionado
+            var row = ListaDeCompras.CurrentRow;
+            if (row == null) return;
+
+            if (double.TryParse(row.Cells[4].Value?.ToString(), out var cantidad) &&
+                double.TryParse(row.Cells[3].Value?.ToString(), out var precio))
+            {
+                cantidad++;
+                row.Cells[4].Value = cantidad;
+                row.Cells[5].Value = (cantidad * precio).ToString("0.00");
+
+                totalActivo += precio;
+                descuentoActivo += precio * (productoActivo != null ? productoActivo.Descuento : 1);
+                AsignarTotales();
+            }
+        }
+        #endregion
+
+        #region Procesamiento de venta
+
+        private async Task<SalePreparationResult?> ValidateAndPrepareSaleAsync(string actionLabel)
+        {
+            if (!await PermissionAccess.EnsurePermissionAsync(empleado, AppPermissions.VentasCrear, this, actionLabel))
+                return null;
+
+            var preparation = await BuildSalePreparationAsync();
+            if (!preparation.IsValid)
+            {
+                var details = string.Join(Environment.NewLine, preparation.Issues.Select(i => $"- {i.Message} ({i.Code})"));
+                MessageBox.Show($"No se puede continuar:\n{details}", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return null;
+            }
+            ApplyTotals(preparation.Totals);
+            return preparation;
+        }
+
+        private async Task<bool> ExecuteSalePersistenceAsync(bool paid, SalePreparationResult preparation, bool isQuotation = false)
+        {
+            var result = await RegistrarFacturaAsync(paid, preparation, isQuotation);
+            if (!result.Success)
+            {
+                MostrarEstado(result.Message, true);
+                MessageBox.Show(result.Message, "Error de persistencia", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            MostrarEstado("Operación completada correctamente.", false);
+            return true;
+        }
+
+        private async void button18_Click(object sender, EventArgs e)
+        {
+            var preparation = await ValidateAndPrepareSaleAsync("registrar venta");
+            if (preparation == null) return;
+
+            if (!await ExecuteSalePersistenceAsync(false, preparation))
+                return;
+            LimpiarTodo();
+        }
+
+        private async void Cobrar_Click(object sender, EventArgs e)
+        {
+            var preparation = await ValidateAndPrepareSaleAsync("cobrar venta");
+            if (preparation == null) return;
+
+            if (ValidarDireccionParaEnvio())
+            {
+                MostrarAvisoDireccionFaltante();
+                return;
+            }
+
+            if (!await ExecuteSalePersistenceAsync(true, preparation))
+                return;
+
+            // Abre ventana de pago con cliente y factura actual
+            var ventanaPagar = new VentanaPagar
+            {
+                facturaActiva = facturaActiva,
+                ClienteActivo = await new Cliente().BuscarAsync(IdCliente.Text)
+            };
+            ventanaPagar.ShowDialog();
+        }
+
+        private bool ValidarDireccionParaEnvio()
+            => N.Checked && string.IsNullOrWhiteSpace(direccion.Text);
+
+        private void MostrarAvisoDireccionFaltante()
+        {
+            MostrarEstado("Debe indicar dirección para envíos.", true);
+            direccion.Focus();
+            MessageBox.Show(
+                "La factura se marcó para enviar, debe agregar una dirección.",
+                "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Error
+            );
+        }
+        #endregion
+        #region Navegación y foco
+
+        // Lleva el foco al campo de producto
+        private void button4_Click(object sender, EventArgs e)
+            => Id.Focus();
+
+        #endregion
+
+        #region Cobrar y Generar Factura
+
+        // Cobrar y registrar la factura; ahora async para await RegistrarFacturaAsync
+        private async void button5_Click(object sender, EventArgs e)
+        {
+            var preparation = await ValidateAndPrepareSaleAsync("generar factura");
+            if (preparation == null) return;
+
+            Configuraciones confi = new Configuraciones().ObtenerPorId(1);
+            if (confi != null)
+            {
+                // Validar dirección si se marcó para enviar
+                if (N.Checked && string.IsNullOrWhiteSpace(direccion.Text))
+            {
+                Aviso.Visible = true;
+                label11.ForeColor = Color.Red;
+                MessageBox.Show(
+                    "La factura se marcó para enviar, debe agregar una dirección.",
+                    "Aviso",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
+            }
+
+            if (!await ExecuteSalePersistenceAsync(true, preparation))
+                return;
+
+            // Restaurar UI
+            label11.ForeColor = Color.White;
+            Aviso.Visible = false;
+
+            if (ListaDeCompras.Rows.Count <= 1)
+            {
+                MessageBox.Show(
+                    "Todavía no ha registrado ningún producto para cobrar.",
+                    "Aviso",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            // Marcar como pagada y generar impresión según tipo
+            facturaActiva.Paga = true;
+            facturaActiva.NombreCliente = NombreCliente.Text;
+            facturaActiva.Direccion = direccion.Text;
+            facturaActiva.Description = descripcion.Text;
+
+            switch (tipoFactura.Text)
+            {
+                case "Comprobante Gubernamental":
+                    facturaActiva.GenerarFacturaGubernamental();
+                    break;
+                case "Comprobante Fiscal":
+                    facturaActiva.GenerarFacturaComprobante();
+                    break;
+                case "Consumo":
+                    facturaActiva.GenerarFacturaAsync();
+                    break;
+                default:
+                    facturaActiva.GenerarFactura1();
+                    break;
+            }
+
+            // Actualizar BD e inventario
+            await facturaActiva.ActualizarFacturaAsync();
+            if (!esCargada)
+                await facturaActiva.RegistrarProductosAsync(+1);
+
+            LimpiarTodo();
+            }
+            else MessageBox.Show("Todavia este Sistema no se ha configurado para empezar a trabajar! Dirijase a configuraciones para configurar correctamente", "ATENCION", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+        }
+
+        #endregion
+
+        #region Imprimir Factura Manual
+
+        // Botón imprime la factura activa usando PrinterClass
+        private void label6_Click(object sender, EventArgs e)
+        {
+            var printer = new Imprimir();
+            printer.ImprimirFactura(
+                new Configuraciones().ObtenerPorId(1).Impresora
+            );
+        }
+
+        #endregion
+
+        #region Reporte de Ventas
+
+        // Botón genera reporte de ventas en PDF
+        private async void button5_Click_1(object sender, EventArgs e)
+        {
+            if (N.Checked && string.IsNullOrWhiteSpace(direccion.Text))
+            {
+                Aviso.Visible = true;
+                label11.ForeColor = Color.Red;
+                MessageBox.Show(
+                    "La factura se marcó para enviar, debe agregar una dirección.",
+                    "Aviso",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+                return;
+            }
+
+            label11.ForeColor = Color.White;
+            Aviso.Visible = false;
+
+            if (facturaActiva == null || ListaDeCompras.Rows.Count <= 1)
+            {
+                MessageBox.Show(
+                    "Todavía no ha registrado ningún producto para cobrar.",
+                    "Aviso",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            facturaActiva.TipoFactura = tipoFactura.Text;
+            facturaActiva.Paga = true;
+            facturaActiva.NombreCliente = NombreCliente.Text;
+            facturaActiva.Direccion = direccion.Text;
+            facturaActiva.Description = descripcion.Text;
+
+            await facturaActiva.ActualizarFacturaAsync();
+
+            var reportes = new Reportes { FacturaActiva = facturaActiva };
+            await Task.Run(() => reportes.GenerarReporteVentasPDFAsync());
+
+            LimpiarTodo();
+        }
+
+        #endregion
+
+        #region Cliente por nombre
+
+        // Autocompletar y buscar cliente al presionar Enter
+        private async void NombreCliente_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar != (char)Keys.Enter) return;
+
+            var cliente = await new Cliente().BuscarPorClaveAsync("nombre", NombreCliente.Text);
+            if (cliente != null)
+            {
+                IdCliente.Text = cliente.Id;
+                direccion.Text = cliente.Direccion;
+            }
+        }
+
+        private void NombreCliente_Enter(object sender, EventArgs e)
+        {
+            // Opcional: abrir dropdown de autocompletado
+            NombreCliente.SelectAll();
+        }
+
+        private async void NombreCliente_TextChanged(object sender, EventArgs e)
+        {
+            var cliente = await new Cliente().BuscarPorClaveAsync("nombre", NombreCliente.Text);
+            if (cliente != null)
+            {
+                IdCliente.Text = cliente.Id;
+                direccion.Text = cliente.Direccion;
+            }
+        }
+
+        #endregion
+
+        #region Búsqueda RNC
+
+        // Busca datos en un archivo rnc.txt
+        private string[] BuscarPorRNC(string rnc)
+        {
+            const string ruta = @"rnc.txt";
+            if (!File.Exists(ruta)) return null;
+
+            foreach (var linea in File.ReadLines(ruta))
+            {
+                if (!linea.Contains(rnc)) continue;
+
+                var partes = linea.Split('|');
+                MessageBox.Show(
+                    $"RNC: {partes[0]}\nNombre: {partes[1]}\nDescripción: {partes[3]}\nFecha: {partes[8]}\nEstado: {partes[9]}",
+                    "RNC encontrado!",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return new[] { partes[0], partes[1] };
+            }
+            return null;
+        }
+
+        #endregion
+
+        #region Cambio de Tipo de Factura
+
+        // Guarda la selección en configuración
+        private void tipoFactura_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var config = new Configuraciones().ObtenerPorId(1);
+            if (config != null) {
+                config.Seleccion = tipoFactura.Text;
+                config.Guardar();
+            }
+            
+        }
+
+        #endregion
+
+        #region Acción vacía (placeholder)
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            // Este botón no tiene funcionalidad asignada
+        }
+
+        #endregion
+        #region Cotizar Venta
+
+        /// <summary>
+        /// Realiza una cotización sin marcar como pagada.
+        /// </summary>
+        public async Task CotizarAsync()
+        {
+            var preparation = await ValidateAndPrepareSaleAsync("cotizar venta");
+            if (preparation == null) return;
+
+            // Registra factura en BD sin marcarla pagada
+            if (!await ExecuteSalePersistenceAsync(false, preparation, isQuotation: true))
+                return;
+
+            // Reset UI
+            label11.ForeColor = Color.White;
+            Aviso.Visible = false;
+
+            if (ListaDeCompras.Rows.Count <= 1)
+            {
+                MessageBox.Show(
+                    "Todavía no ha registrado ningún producto para cotizar.",
+                    "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            // Configura la factura como cotización
+            facturaActiva.Paga = false;
+            facturaActiva.Cotizacion = true;
+            facturaActiva.NombreCliente = NombreCliente.Text;
+            facturaActiva.Direccion = direccion.Text;
+            facturaActiva.Description = descripcion.Text;
+
+            // Genera la cotización PDF
+            facturaActiva.GenerarFactura1();
+
+            // Actualiza en BD
+            await facturaActiva.ActualizarFacturaAsync();
+
+            LimpiarTodo();
+        }
+
+        #endregion
+
+        #region Búsqueda Dinámica de Productos (async)
+
+        private async void textBox1_TextChanged(object sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+            await Task.CompletedTask;
+        }
+
+        private async Task EjecutarBusquedaProductosAsync()
+        {
+            _searchDebounceTimer.Stop();
+            var requestVersion = ++_searchRequestVersion;
+            ListaProductos.Rows.Clear();
+
+            var term = NombreABuscar.Text?.Trim().ToLower();
+            if (string.IsNullOrEmpty(term)) return;
+            if (term.Length < 2) return;
+
+            var searchResult = await AppServices.Product.SearchByNameAsync(term, limit: 30, excludeGeneric: true);
+            if (requestVersion != _searchRequestVersion) return;
+            if (!searchResult.Success) return;
+
+            foreach (var prod in searchResult.Products)
+            {
+                ListaProductos.Rows.Add(
+                    prod.Id,
+                    prod.Nombre,
+                    prod.Descripcion,
+                    prod.Precio.FirstOrDefault()
+                );
+            }
+        }
+
+        #endregion
+
+        #region Selección de Producto desde Resultado
+
+        private async void ListaProductos_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var id = ListaProductos.Rows[e.RowIndex].Cells[0].Value?.ToString();
+            if (string.IsNullOrEmpty(id)) return;
+
+            // Busca producto async
+            var lookup = await AppServices.Product.FindByCodeAsync(id);
+            var producto = lookup.Product;
+            if (producto != null)
+            {
+                codigoProducto = id;
+                await DetectaProductoAsync();
+                AsignarTotales();
+            }
+
+            ListaProductos.Rows.Clear();
+            NombreABuscar.Clear();
+            Id.Focus();
+        }
+
+        #endregion
+
+        #region Imprimir Rápido con PrinterClass
+
+        private void label11_Click(object sender, EventArgs e)
+        {
+            var printer = new PrinterClass(lineWidth: 48)
+            {
+                PrinterName = "80mm Series Printer (Copiar 1)"
+            };
+
+            // Configura logo y encabezados
+            printer.SetLogo(SistemaFerreteriaV8.Properties.Resources.logo_ivan_modificado_3);
+            printer.AddCenteredLine("FERRETERIA XYZ");
+            printer.AddCenteredLine("RNC: 123456789");
+            printer.AddCenteredLine("Tel: 809-555-1234");
+            printer.AddSeparator();
+
+            // Ejemplo de demostración
+            printer.AddLine("Factura No: 00123");
+            printer.AddLine($"Fecha: {DateTime.Now:dd/MM/yyyy}");
+            printer.AddSeparator();
+            printer.AgregaArticulo(10.00, "Martillo de construcción", 2, 20.00);
+            printer.AgregaArticulo(5.00, "Destornillador", 1, 5.00);
+            printer.AddSeparator();
+            printer.AddRightAlignedLine("Total: $25.00");
+            printer.AddSeparator();
+            printer.AddCenteredLine("Gracias por su compra");
+            printer.AddCenteredLine("¡Vuelva pronto!");
+        }
+
+        #endregion
+
+        #region Actualizar Fechas Masivas
+
+        private async void label10_Click(object sender, EventArgs e)
+        {
+            var listFact = new List<Factura>();
+            for (int id = 6574; id < 6580; id++)
+            {
+                var fact = await Factura.BuscarAsync(id);
+                if (fact != null)
+                {
+                    fact.Fecha = fact.Fecha.AddDays(10);
+                    await fact.ActualizarFacturaAsync();
+                    listFact.Add(fact);
+                }
+            }
+            MessageBox.Show("Tarea Finalizada!");
+            new Reportes().GenerarReportes(listFact, DateTime.Now, DateTime.Now);
+        }
+
+        #endregion
+
+        #region Tecla de Descuento
+
+        private void ADescontar_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            // Solo permitir dígitos y punto
+            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
+                e.Handled = true;
+        }
+
+        #endregion
+
+        #region Integración WooCommerce Async
+
+        private async void button6_Click_1(object sender, EventArgs e)
+        {
+            var api = new WooCommerce.WooCommerce();
+            await api.EjecutarWooCommerce();
+            ListaDeCompras.Rows.Add(api.P.fee_lines.Count);
+        }
+
+        #endregion
+
+
+    }
+}
