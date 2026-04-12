@@ -278,12 +278,14 @@ namespace SistemaFerreteriaV8
             {
                 facturaActiva = new Factura
                 {
-                    Id = Factura.GenerarSiguienteId()
+                    Id = 0
                 };
             }
 
-            // Mostrar número de factura actual
-            NoFactura.Text = facturaActiva.Id > 0 ? facturaActiva.Id.ToString() : "Pendiente";
+            // Mostrar número estimado sin consumir secuencia al entrar a la ventana
+            NoFactura.Text = facturaActiva.Id > 0
+                ? facturaActiva.Id.ToString()
+                : Factura.GenerarSiguienteId().ToString();
         }
 
         #endregion
