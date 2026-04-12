@@ -38,8 +38,12 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
             var listProducts = mapResult.Products;
             var stockItems = listProducts
-                .Where(p => p.Producto != null && !string.Equals(p.Producto.Nombre, "Generico", StringComparison.OrdinalIgnoreCase))
-                .Select(p => new StockMovementItem(p.Producto.Id ?? string.Empty, p.Producto.Nombre ?? string.Empty, p.Cantidad))
+                .Zip(request.Draft.Lines, (persisted, draftLine) => new { persisted, draftLine })
+                .Where(x => x.persisted.Producto != null && !x.draftLine.IsGeneric)
+                .Select(x => new StockMovementItem(
+                    x.persisted.Producto!.Id ?? string.Empty,
+                    x.persisted.Producto.Nombre ?? string.Empty,
+                    x.persisted.Cantidad))
                 .ToList();
 
             var invoice = new Factura
@@ -218,7 +222,8 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
             {
                 product = new Productos
                 {
-                    Nombre = "Generico",
+                    Nombre = string.IsNullOrWhiteSpace(line.ProductName) ? "Generico" : line.ProductName,
+                    Descripcion = "Venta sin inventario",
                     Precio = new List<double> { line.UnitPrice, line.UnitPrice, line.UnitPrice, line.UnitPrice }
                 };
             }

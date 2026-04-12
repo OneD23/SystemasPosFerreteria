@@ -478,8 +478,19 @@ namespace SistemaFerreteriaV8
                 {
                     var lookup = await AppServices.Product.FindByNameAsync(productName);
                     found = lookup.Found && lookup.Product != null;
-                    stock = lookup.Product?.Cantidad ?? 0;
-                    productId = lookup.Product?.Id ?? string.Empty;
+                    if (found)
+                    {
+                        stock = lookup.Product?.Cantidad ?? 0;
+                        productId = lookup.Product?.Id ?? string.Empty;
+                    }
+                    else
+                    {
+                        // Permite vender líneas no inventariadas conservando nombre y precio capturados en UI.
+                        isGeneric = true;
+                        found = true;
+                        stock = double.MaxValue;
+                        productId = string.Empty;
+                    }
                 }
 
                 lines.Add(new SaleLineInput(
