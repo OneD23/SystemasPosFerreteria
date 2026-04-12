@@ -92,7 +92,6 @@
             this.ListaProductos.RowHeadersVisible = false;
             this.ListaProductos.Size = new System.Drawing.Size(704, 209);
             this.ListaProductos.TabIndex = 3;
-            this.ListaProductos.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ListaProductos_CellContentClick);
             this.ListaProductos.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.ListaProductos_CellContentClick);
             this.ListaProductos.KeyDown += new System.Windows.Forms.KeyEventHandler(this.ListaProductos_KeyDown);
             // 
