@@ -41,8 +41,6 @@ public sealed class SalesService : ISalesService
             {
                 if (!line.ProductFound)
                     issues.Add(new SaleValidationIssue($"linea:{line.ProductName}", "Producto no encontrado para validar stock."));
-                else if (line.Quantity > line.AvailableStock)
-                    issues.Add(new SaleValidationIssue($"linea:{line.ProductName}", "Stock insuficiente."));
             }
         }
 
