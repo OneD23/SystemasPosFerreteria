@@ -21,6 +21,8 @@ namespace SistemaFerreteriaV8
             SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
             ModernizarFormulario();
             ConfigurarAtajosTeclado();
+            AjustarLayoutFactura();
+            Resize += (_, _) => AjustarLayoutFactura();
         }
 
         private void ModernizarFormulario()
@@ -65,6 +67,72 @@ namespace SistemaFerreteriaV8
             };
         }
 
+        private void AjustarLayoutFactura()
+        {
+            const int margen = 16;
+            const int separacion = 10;
+            int anchoUtil = ClientSize.Width - (margen * 2);
+
+            Titulo.Location = new Point((ClientSize.Width - Titulo.Width) / 2, 18);
+            DireccionNegocio.Location = new Point((ClientSize.Width - DireccionNegocio.Width) / 2, Titulo.Bottom + separacion);
+            tel.Location = new Point((ClientSize.Width - tel.Width) / 2, DireccionNegocio.Bottom + separacion);
+            label7.Location = new Point((ClientSize.Width / 2) - 50, tel.Bottom + separacion);
+            RNC.Location = new Point(label7.Right + 6, label7.Top);
+
+            TipoFactura.Location = new Point(margen, label7.Bottom + 24);
+
+            int labelColX = margen;
+            int labelColW = 95;
+            int valueColX = labelColX + labelColW + 6;
+            int valueColW = 290;
+            int rowY = TipoFactura.Bottom + 12;
+            int rowGap = 30;
+
+            void AlignRow(Label label, Label value, string fallback = "")
+            {
+                label.AutoSize = false;
+                label.TextAlign = ContentAlignment.MiddleRight;
+                label.Location = new Point(labelColX, rowY);
+                label.Size = new Size(labelColW, 22);
+
+                value.AutoSize = false;
+                value.AutoEllipsis = true;
+                value.Location = new Point(valueColX, rowY);
+                value.Size = new Size(valueColW, 22);
+                value.TextAlign = ContentAlignment.MiddleLeft;
+                if (string.IsNullOrWhiteSpace(value.Text))
+                    value.Text = fallback;
+
+                rowY += rowGap;
+            }
+
+            AlignRow(label4, NFC, "—");
+            AlignRow(label9, Valido, "—");
+            AlignRow(label10, Fecha, "—");
+            AlignRow(label12, RNCCliente, "—");
+            AlignRow(label14, Cliente, "Generico");
+            AlignRow(label11, Direccion, "—");
+
+            label8.Location = new Point(ClientSize.Width - 190, TipoFactura.Bottom + 16);
+            IdFactura.Location = new Point(label8.Right + 6, TipoFactura.Bottom + 14);
+            IdFactura.Width = 90;
+
+            dataGridView1.Location = new Point(margen, rowY + 6);
+            dataGridView1.Size = new Size(anchoUtil, Math.Max(170, ClientSize.Height - dataGridView1.Top - 150));
+
+            int yPie = dataGridView1.Bottom + 8;
+            label13.Location = new Point(ClientSize.Width - 118, yPie);
+            total.Location = new Point(ClientSize.Width - 78, yPie);
+
+            int wBtn = 120;
+            int hBtn = 44;
+            int yBtns = ClientSize.Height - hBtn - 16;
+            button2.SetBounds(margen, yBtns, wBtn, hBtn);
+            button1.SetBounds(button2.Right + 20, yBtns, wBtn, hBtn);
+            Actualizar.SetBounds(button1.Right + 20, yBtns, wBtn, hBtn);
+            Eliminar.SetBounds(Actualizar.Right + 20, yBtns, wBtn, hBtn);
+        }
+
         private void MostrarEstado(string mensaje, bool error = false)
         {
             UiConsistencia.MostrarEstado(lblEstado, mensaje, error);
@@ -106,6 +174,8 @@ namespace SistemaFerreteriaV8
                 }
                 total.Text = Factura.Total.ToString("c2");
             }
+
+            AjustarLayoutFactura();
         }
 
         private async void Eliminar_Click(object sender, EventArgs e)
