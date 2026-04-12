@@ -394,7 +394,6 @@
             ListaProductos.RowTemplate.DefaultCellStyle.ForeColor = Color.Black;
             ListaProductos.Size = new Size(723, 151);
             ListaProductos.TabIndex = 7;
-            ListaProductos.CellClick += ListaProductos_CellContentClick;
             ListaProductos.CellContentClick += ListaProductos_CellContentClick;
             // 
             // Column5
@@ -1040,4 +1039,3 @@
         private DataGridViewTextBoxColumn SubTotal1;
     }
 }
-
