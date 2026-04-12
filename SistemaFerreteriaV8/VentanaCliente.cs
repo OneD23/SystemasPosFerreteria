@@ -30,7 +30,7 @@ namespace SistemaFerreteriaV8
         {
             int margen = 12;
             int espacio = 12;
-            int altoFormulario = 380;
+            int altoFormulario = 430;
 
             groupBox1.Location = new Point(margen, margen);
             groupBox1.Size = new Size(430, altoFormulario);
@@ -77,10 +77,10 @@ namespace SistemaFerreteriaV8
             ListaDeClientes.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             ListaDeClientes.MultiSelect = false;
 
-            int yBotones = groupBox1.Height - 106;
             int wBtn = 92;
             int hBtn = 36;
             int sep = 10;
+            int yBotones = CreditoActivo2.Bottom + 12;
             Nuevo.SetBounds(28, yBotones, wBtn, hBtn);
             Editar.SetBounds(28 + wBtn + sep, yBotones, wBtn, hBtn);
             Guardar.SetBounds(28 + ((wBtn + sep) * 2), yBotones, wBtn, hBtn);
