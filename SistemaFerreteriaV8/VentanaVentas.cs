@@ -402,14 +402,16 @@ namespace SistemaFerreteriaV8
 
             facturaActiva.Id = idFactura;
             NoFactura.Text = idFactura.ToString();
+            var customerId = (IdCliente.Text ?? string.Empty).Trim();
+            var rncDocumento = await ResolverDocumentoFiscalClienteAsync(customerId);
 
             var draft = AppServices.Sales.BuildInvoiceDraft(
                 preparation,
                 new InvoiceDraftMetadata(
                     InvoiceId: idFactura,
-                    CustomerId: IdCliente.Text,
+                    CustomerId: customerId,
                     CustomerName: NombreCliente.Text,
-                    Rnc: IdCliente.Text,
+                    Rnc: rncDocumento,
                     EmployeeId: empleado.Id.ToString(),
                     CompanyId: cajaActiva?.Id ?? "Empresa no definida",
                     InvoiceType: tipoFactura.Text,
@@ -430,6 +432,24 @@ namespace SistemaFerreteriaV8
 
             return workflow;
         }
+
+        private async Task<string> ResolverDocumentoFiscalClienteAsync(string customerId)
+        {
+            if (TieneOnceDigitos(customerId))
+                return SoloDigitos(customerId);
+
+            var cliente = await new Cliente().BuscarAsync(customerId);
+            if (cliente != null && TieneOnceDigitos(cliente.Cedula))
+                return SoloDigitos(cliente.Cedula);
+
+            return customerId;
+        }
+
+        private static bool TieneOnceDigitos(string? value)
+            => SoloDigitos(value).Length == 11;
+
+        private static string SoloDigitos(string? value)
+            => new string((value ?? string.Empty).Where(char.IsDigit).ToArray());
 
         // 2. AsignarTotales mantiene cálculos en UI thread
         public void AsignarTotales()
