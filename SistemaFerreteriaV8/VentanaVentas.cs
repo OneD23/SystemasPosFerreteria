@@ -39,9 +39,11 @@ namespace SistemaFerreteriaV8
             InitializeComponent();
             SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
             AjustarAlineacionVisual();
+            AjustarLayoutBusquedaPorNombre();
             ModernizarControlesVenta();
             WireFastCheckoutEvents();
             _searchDebounceTimer.Tick += async (_, _) => await EjecutarBusquedaProductosAsync();
+            Resize += (_, _) => AjustarLayoutBusquedaPorNombre();
         }
         private void AjustarAlineacionVisual()
         {
@@ -133,6 +135,25 @@ namespace SistemaFerreteriaV8
 
             Aviso.Visible = false;
             statusTimer.Tick += (_, _) => { Aviso.Visible = false; statusTimer.Stop(); };
+        }
+
+        private void AjustarLayoutBusquedaPorNombre()
+        {
+            const int margenHorizontal = 12;
+            const int top = 22;
+            const int separacion = 10;
+
+            label10.AutoSize = true;
+            label10.Location = new Point(margenHorizontal, top + 2);
+
+            NombreABuscar.Location = new Point(label10.Right + separacion, top);
+            var anchoDisponible = BuscarPorNombreBox.Width - NombreABuscar.Left - margenHorizontal;
+            NombreABuscar.Width = Math.Max(160, Math.Min(320, anchoDisponible));
+
+            ListaProductos.Location = new Point(margenHorizontal, NombreABuscar.Bottom + 10);
+            ListaProductos.Size = new Size(
+                Math.Max(200, BuscarPorNombreBox.Width - (margenHorizontal * 2)),
+                Math.Max(80, BuscarPorNombreBox.Height - ListaProductos.Top - 12));
         }
 
         private static void EstilizarGrid(DataGridView grid)
@@ -478,8 +499,19 @@ namespace SistemaFerreteriaV8
                 {
                     var lookup = await AppServices.Product.FindByNameAsync(productName);
                     found = lookup.Found && lookup.Product != null;
-                    stock = lookup.Product?.Cantidad ?? 0;
-                    productId = lookup.Product?.Id ?? string.Empty;
+                    if (found)
+                    {
+                        stock = lookup.Product?.Cantidad ?? 0;
+                        productId = lookup.Product?.Id ?? string.Empty;
+                    }
+                    else
+                    {
+                        // Permite vender líneas no inventariadas conservando nombre y precio capturados en UI.
+                        isGeneric = true;
+                        found = true;
+                        stock = double.MaxValue;
+                        productId = string.Empty;
+                    }
                 }
 
                 lines.Add(new SaleLineInput(
