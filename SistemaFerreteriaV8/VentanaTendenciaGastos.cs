@@ -184,89 +184,106 @@ namespace SistemaFerreteriaV8
             lblEstado.Text = "Cargando tendencia...";
             lblEstado.ForeColor = Color.Gainsboro;
 
-            chartTendencia.Series.Clear();
-            chartTendencia.ChartAreas[0].AxisX.StripLines.Clear();
-
-            var serieVentas = new Series("Ventas acumuladas")
+            try
             {
-                ChartType = SeriesChartType.Line,
-                BorderWidth = 3,
-                Color = Color.LimeGreen
-            };
+                chartTendencia.Series.Clear();
+                chartTendencia.ChartAreas[0].AxisX.StripLines.Clear();
 
-            var serieGasto = new Series("Límite gasto mensual")
-            {
-                ChartType = SeriesChartType.Line,
-                BorderWidth = 3,
-                Color = Color.Red
-            };
-
-            double gastoMensual = double.TryParse(txtGastoMensual.Text, out var g) ? g : 0;
-            int diaActual = DateTime.Now.Day;
-            var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            var finMes = inicioMes.AddMonths(1).AddTicks(-1);
-            var empleados = await Empleado.ListarAsync();
-            var gastosDiarios = await GastoDiario.ListarPorRangoAsync(inicioMes, finMes);
-            var totalNomina = empleados.Sum(e => e.SueldoMensual);
-            var totalGastosDiarios = gastosDiarios.Sum(gd => gd.Monto);
-            var gastoTotalMes = gastoMensual + totalNomina + totalGastosDiarios;
-
-            var facturasMes = (await Factura.ListarFacturasPorFechaAsync(inicioMes, finMes))
-                .Where(f => !f.Eliminada)
-                .OrderBy(f => f.Fecha)
-                .ToList();
-
-            double acumulado = 0;
-            int cruceDia = -1;
-            for (int dia = 1; dia <= diaActual; dia++)
-            {
-                acumulado += facturasMes
-                    .Where(f => f.Fecha.Day == dia)
-                    .Sum(f => f.Total);
-
-                serieVentas.Points.AddXY(dia, acumulado);
-                var puntoGasto = serieGasto.Points.AddXY(dia, gastoTotalMes);
-
-                if (cruceDia == -1 && gastoTotalMes > 0 && acumulado >= gastoTotalMes)
+                var serieVentas = new Series("Ventas acumuladas")
                 {
-                    cruceDia = dia;
-                    serieGasto.Points[puntoGasto].MarkerStyle = MarkerStyle.Cross;
-                    serieGasto.Points[puntoGasto].MarkerSize = 12;
+                    ChartType = SeriesChartType.Line,
+                    BorderWidth = 3,
+                    Color = Color.LimeGreen
+                };
+
+                var serieGasto = new Series("Límite gasto mensual")
+                {
+                    ChartType = SeriesChartType.Line,
+                    BorderWidth = 3,
+                    Color = Color.Red
+                };
+
+                double gastoMensual = double.TryParse(txtGastoMensual.Text, out var g) ? g : 0;
+                int diaActual = DateTime.Now.Day;
+                var inicioMes = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+                var finMes = inicioMes.AddMonths(1).AddTicks(-1);
+                var empleados = await Empleado.ListarAsync();
+                var gastosDiarios = await GastoDiario.ListarPorRangoAsync(inicioMes, finMes);
+                var totalNomina = empleados.Sum(e => e.SueldoMensual);
+                var totalGastosDiarios = gastosDiarios.Sum(gd => gd.Monto);
+                var gastoTotalMes = gastoMensual + totalNomina + totalGastosDiarios;
+
+                var facturasMes = (await Factura.ListarFacturasPorFechaAsync(inicioMes, finMes))
+                    .Where(f => !f.Eliminada)
+                    .OrderBy(f => f.Fecha)
+                    .ToList();
+
+                double acumulado = 0;
+                int cruceDia = -1;
+                for (int dia = 1; dia <= diaActual; dia++)
+                {
+                    acumulado += facturasMes
+                        .Where(f => f.Fecha.Day == dia)
+                        .Sum(f => f.Total);
+
+                    serieVentas.Points.AddXY(dia, acumulado);
+                    var puntoGasto = serieGasto.Points.AddXY(dia, gastoTotalMes);
+
+                    if (cruceDia == -1 && gastoTotalMes > 0 && acumulado >= gastoTotalMes)
+                    {
+                        cruceDia = dia;
+                        serieGasto.Points[puntoGasto].MarkerStyle = MarkerStyle.Cross;
+                        serieGasto.Points[puntoGasto].MarkerSize = 12;
+                    }
+
+                    if (cruceDia != -1 && dia > cruceDia)
+                    {
+                        serieGasto.Points[puntoGasto].IsEmpty = true; // romper línea roja al superar gasto
+                    }
                 }
 
-                if (cruceDia != -1 && dia > cruceDia)
+                chartTendencia.Series.Add(serieVentas);
+                chartTendencia.Series.Add(serieGasto);
+                var gananciaNeta = acumulado - gastoTotalMes;
+                lblResumen.Text = $"Ventas: {acumulado:C2} | Gastos: {gastoTotalMes:C2} (Nómina: {totalNomina:C2}, Diario: {totalGastosDiarios:C2}) | Ganancia: {gananciaNeta:C2}";
+                lblResumen.ForeColor = gananciaNeta >= 0 ? Color.LightGreen : Color.OrangeRed;
+
+                if (cruceDia != -1)
                 {
-                    serieGasto.Points[puntoGasto].IsEmpty = true; // romper línea roja al superar gasto
+                    chartTendencia.ChartAreas[0].AxisX.StripLines.Add(new StripLine
+                    {
+                        IntervalOffset = cruceDia,
+                        StripWidth = 0.15,
+                        BackColor = Color.FromArgb(140, Color.Red)
+                    });
+                    lblEstado.Text = $"✅ Punto de equilibrio alcanzado el día {cruceDia}.";
+                    lblEstado.ForeColor = Color.LightGreen;
+                }
+                else
+                {
+                    lblEstado.Text = "⚠ Aún no se supera el gasto mensual.";
+                    lblEstado.ForeColor = Color.Gold;
                 }
             }
-
-            chartTendencia.Series.Add(serieVentas);
-            chartTendencia.Series.Add(serieGasto);
-            var gananciaNeta = acumulado - gastoTotalMes;
-            lblResumen.Text = $"Ventas: {acumulado:C2} | Gastos: {gastoTotalMes:C2} (Nómina: {totalNomina:C2}, Diario: {totalGastosDiarios:C2}) | Ganancia: {gananciaNeta:C2}";
-            lblResumen.ForeColor = gananciaNeta >= 0 ? Color.LightGreen : Color.OrangeRed;
-
-            if (cruceDia != -1)
+            catch (Exception ex)
             {
-                chartTendencia.ChartAreas[0].AxisX.StripLines.Add(new StripLine
-                {
-                    IntervalOffset = cruceDia,
-                    StripWidth = 0.15,
-                    BackColor = Color.FromArgb(140, Color.Red)
-                });
-                lblEstado.Text = $"✅ Punto de equilibrio alcanzado el día {cruceDia}.";
-                lblEstado.ForeColor = Color.LightGreen;
+                lblEstado.Text = "Error al cargar tendencia.";
+                lblEstado.ForeColor = Color.OrangeRed;
+                MessageBox.Show(
+                    "No se pudo cargar la tendencia.\n\n" +
+                    "Verifica conexión con MongoDB y vuelve a intentar.\n\n" +
+                    "Detalle: " + ex.Message,
+                    "Tendencia de gastos",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
             }
-            else
+            finally
             {
-                lblEstado.Text = "⚠ Aún no se supera el gasto mensual.";
-                lblEstado.ForeColor = Color.Gold;
+                btnActualizar.Enabled = true;
+                btnGuardar.Enabled = true;
+                btnRegistrarGasto.Enabled = true;
+                cargando = false;
             }
-
-            btnActualizar.Enabled = true;
-            btnGuardar.Enabled = true;
-            btnRegistrarGasto.Enabled = true;
-            cargando = false;
         }
     }
 }
