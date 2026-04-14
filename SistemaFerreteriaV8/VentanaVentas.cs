@@ -389,7 +389,7 @@ namespace SistemaFerreteriaV8
             if (facturaActiva == null) return new SalesWorkflowResult(false, "No hay factura activa.");
 
             // 2. Obtener caja activa de forma asíncrona
-            var cajaActiva = await  Caja.BuscarPorClaveAsync("estado", "true");
+            var cajaActiva = await Caja.BuscarPorClaveAsync("estado", "true");
 
             // 3. Crear o actualizar factura
             int idFactura = facturaActiva?.Id ?? 0;
@@ -535,8 +535,19 @@ namespace SistemaFerreteriaV8
                 {
                     var lookup = await AppServices.Product.FindByNameAsync(productName);
                     found = lookup.Found && lookup.Product != null;
-                    stock = lookup.Product?.Cantidad ?? 0;
-                    productId = lookup.Product?.Id ?? string.Empty;
+                    if (found)
+                    {
+                        stock = lookup.Product?.Cantidad ?? 0;
+                        productId = lookup.Product?.Id ?? string.Empty;
+                    }
+                    else
+                    {
+                        // Permite vender líneas no inventariadas conservando nombre y precio capturados en UI.
+                        isGeneric = true;
+                        found = true;
+                        stock = double.MaxValue;
+                        productId = string.Empty;
+                    }
                 }
 
                 lines.Add(new SaleLineInput(
@@ -632,74 +643,74 @@ namespace SistemaFerreteriaV8
         /// Luego recalcula totales.
         /// </summary>
         private void ActualizarListaDeCompras(Productos producto)
-{
-    // Busca la fila existente por nombre de producto
-    var filaExistente = ListaDeCompras.Rows
-        .Cast<DataGridViewRow>()
-        .FirstOrDefault(r => (r.Cells["Nombre"].Value?.ToString() ?? "") == producto.Nombre);
+        {
+            // Busca la fila existente por nombre de producto
+            var filaExistente = ListaDeCompras.Rows
+                .Cast<DataGridViewRow>()
+                .FirstOrDefault(r => (r.Cells["Nombre"].Value?.ToString() ?? "") == producto.Nombre);
 
-    // Obtiene el precio actual según la configuración
-    double precioBase = producto.Nombre != "Generico"
-        ? ObtenerPrecioProducto(producto)
-        : producto.Precio[0];
+            // Obtiene el precio actual según la configuración
+            double precioBase = producto.Nombre != "Generico"
+                ? ObtenerPrecioProducto(producto)
+                : producto.Precio[0];
 
-    if (filaExistente == null)
-    {
-        // Añade nueva fila: Nombre | Descripción | Marca | Precio Unitario | Cantidad | Subtotal
-        int rowIndex = ListaDeCompras.Rows.Add(
-            producto.Nombre,
-            producto.Descripcion,
-            producto.Marca,
-            precioBase.ToString("0.00"),
-            1,
-            precioBase.ToString("0.00")
-        );
-        // Opcional: guarda el objeto de producto en Tag para futuras referencias
-        ListaDeCompras.Rows[rowIndex].Tag = producto;
-    }
-    else
-    {
-        // Incrementa cantidad y actualiza sub-total
-        int cantidad = Convert.ToInt32(filaExistente.Cells["Cantidad"].Value) + 1;
-        filaExistente.Cells["Cantidad"].Value = cantidad;
-        filaExistente.Cells["SubTotal1"].Value = (cantidad * precioBase).ToString("0.00");
-    }
+            if (filaExistente == null)
+            {
+                // Añade nueva fila: Nombre | Descripción | Marca | Precio Unitario | Cantidad | Subtotal
+                int rowIndex = ListaDeCompras.Rows.Add(
+                    producto.Nombre,
+                    producto.Descripcion,
+                    producto.Marca,
+                    precioBase.ToString("0.00"),
+                    1,
+                    precioBase.ToString("0.00")
+                );
+                // Opcional: guarda el objeto de producto en Tag para futuras referencias
+                ListaDeCompras.Rows[rowIndex].Tag = producto;
+            }
+            else
+            {
+                // Incrementa cantidad y actualiza sub-total
+                int cantidad = Convert.ToInt32(filaExistente.Cells["Cantidad"].Value) + 1;
+                filaExistente.Cells["Cantidad"].Value = cantidad;
+                filaExistente.Cells["SubTotal1"].Value = (cantidad * precioBase).ToString("0.00");
+            }
 
-    // Actualiza totales de la venta
-    AsignarTotales();
-}
+            // Actualiza totales de la venta
+            AsignarTotales();
+        }
 
-/// <summary>
-/// Obtiene el precio unitario del producto según la selección en Configuraciones.
-/// </summary>
-private double ObtenerPrecioProducto(Productos producto)
-{
-    // Carga perezosa de configuración
-    var config = new Configuraciones().ObtenerPorId(1);
-    int indicePrecio = config?.Precio ?? 0;
+        /// <summary>
+        /// Obtiene el precio unitario del producto según la selección en Configuraciones.
+        /// </summary>
+        private double ObtenerPrecioProducto(Productos producto)
+        {
+            // Carga perezosa de configuración
+            var config = new Configuraciones().ObtenerPorId(1);
+            int indicePrecio = config?.Precio ?? 0;
 
-    // Valida que el índice exista en la lista de precios
-    if (indicePrecio < 0 || indicePrecio >= producto.Precio.Count)
-        return producto.Precio.First(); // precio por defecto
+            // Valida que el índice exista en la lista de precios
+            if (indicePrecio < 0 || indicePrecio >= producto.Precio.Count)
+                return producto.Precio.First(); // precio por defecto
 
-    return producto.Precio[indicePrecio];
-}
+            return producto.Precio[indicePrecio];
+        }
 
-#endregion
+        #endregion
 
-#region Botón Limpiar Todo
+        #region Botón Limpiar Todo
 
-/// <summary>
-/// Evento del botón 10: limpia todo el formulario de ventas.
-/// Mantiene intactos los datos de configuración y estado del empleado.
-/// </summary>
-private void button10_Click(object sender, EventArgs e)
-{
-    // (Opcional) Si quieres revertir cambios en stock o marcar algo en facturaActiva, hazlo aquí.
-    LimpiarTodo();
-}
+        /// <summary>
+        /// Evento del botón 10: limpia todo el formulario de ventas.
+        /// Mantiene intactos los datos de configuración y estado del empleado.
+        /// </summary>
+        private void button10_Click(object sender, EventArgs e)
+        {
+            // (Opcional) Si quieres revertir cambios en stock o marcar algo en facturaActiva, hazlo aquí.
+            LimpiarTodo();
+        }
 
-#endregion
+        #endregion
 
         private void GlobalKeyListener_KeyPressed(object sender, KeyEventArgs e)
         {
@@ -1017,7 +1028,7 @@ private void button10_Click(object sender, EventArgs e)
 
                 // Ajusta totales internos
                 totalActivo = Math.Max(0, totalActivo - precio);
-                descuentoActivo = Math.Max(0, descuentoActivo - precio * (productoActivo!= null ?productoActivo.Descuento:1));
+                descuentoActivo = Math.Max(0, descuentoActivo - precio * (productoActivo != null ? productoActivo.Descuento : 1));
                 AsignarTotales();
             }
         }
@@ -1148,64 +1159,64 @@ private void button10_Click(object sender, EventArgs e)
             {
                 // Validar dirección si se marcó para enviar
                 if (N.Checked && string.IsNullOrWhiteSpace(direccion.Text))
-            {
-                Aviso.Visible = true;
-                label11.ForeColor = Color.Red;
-                MessageBox.Show(
-                    "La factura se marcó para enviar, debe agregar una dirección.",
-                    "Aviso",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
-                return;
-            }
+                {
+                    Aviso.Visible = true;
+                    label11.ForeColor = Color.Red;
+                    MessageBox.Show(
+                        "La factura se marcó para enviar, debe agregar una dirección.",
+                        "Aviso",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error
+                    );
+                    return;
+                }
 
-            if (!await ExecuteSalePersistenceAsync(true, preparation))
-                return;
+                if (!await ExecuteSalePersistenceAsync(true, preparation))
+                    return;
 
-            // Restaurar UI
-            label11.ForeColor = Color.White;
-            Aviso.Visible = false;
+                // Restaurar UI
+                label11.ForeColor = Color.White;
+                Aviso.Visible = false;
 
-            if (ListaDeCompras.Rows.Count <= 1)
-            {
-                MessageBox.Show(
-                    "Todavía no ha registrado ningún producto para cobrar.",
-                    "Aviso",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning
-                );
-                return;
-            }
+                if (ListaDeCompras.Rows.Count <= 1)
+                {
+                    MessageBox.Show(
+                        "Todavía no ha registrado ningún producto para cobrar.",
+                        "Aviso",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning
+                    );
+                    return;
+                }
 
-            // Marcar como pagada y generar impresión según tipo
-            facturaActiva.Paga = true;
-            facturaActiva.NombreCliente = NombreCliente.Text;
-            facturaActiva.Direccion = direccion.Text;
-            facturaActiva.Description = descripcion.Text;
+                // Marcar como pagada y generar impresión según tipo
+                facturaActiva.Paga = true;
+                facturaActiva.NombreCliente = NombreCliente.Text;
+                facturaActiva.Direccion = direccion.Text;
+                facturaActiva.Description = descripcion.Text;
 
-            switch (tipoFactura.Text)
-            {
-                case "Comprobante Gubernamental":
-                    facturaActiva.GenerarFacturaGubernamental();
-                    break;
-                case "Comprobante Fiscal":
-                    facturaActiva.GenerarFacturaComprobante();
-                    break;
-                case "Consumo":
-                    facturaActiva.GenerarFacturaAsync();
-                    break;
-                default:
-                    facturaActiva.GenerarFactura1();
-                    break;
-            }
+                switch (tipoFactura.Text)
+                {
+                    case "Comprobante Gubernamental":
+                        facturaActiva.GenerarFacturaGubernamental();
+                        break;
+                    case "Comprobante Fiscal":
+                        facturaActiva.GenerarFacturaComprobante();
+                        break;
+                    case "Consumo":
+                        facturaActiva.GenerarFacturaAsync();
+                        break;
+                    default:
+                        facturaActiva.GenerarFactura1();
+                        break;
+                }
 
-            // Actualizar BD e inventario
-            await facturaActiva.ActualizarFacturaAsync();
-            if (!esCargada)
-                await facturaActiva.RegistrarProductosAsync(+1);
+                // Actualizar BD e inventario
+                await facturaActiva.ActualizarFacturaAsync();
+                if (!esCargada)
+                    await facturaActiva.RegistrarProductosAsync(+1);
 
-            LimpiarTodo();
+                LimpiarTodo();
             }
             else MessageBox.Show("Todavia este Sistema no se ha configurado para empezar a trabajar! Dirijase a configuraciones para configurar correctamente", "ATENCION", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
@@ -1339,11 +1350,12 @@ private void button10_Click(object sender, EventArgs e)
         private void tipoFactura_SelectedIndexChanged(object sender, EventArgs e)
         {
             var config = new Configuraciones().ObtenerPorId(1);
-            if (config != null) {
+            if (config != null)
+            {
                 config.Seleccion = tipoFactura.Text;
                 config.Guardar();
             }
-            
+
         }
 
         #endregion
@@ -1539,5 +1551,6 @@ private void button10_Click(object sender, EventArgs e)
         #endregion
 
 
+        
     }
 }
