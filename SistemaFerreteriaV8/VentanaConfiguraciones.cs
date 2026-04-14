@@ -21,6 +21,13 @@ namespace SistemaFerreteriaV8
         private TextBox txtColorPrimario;
         private TextBox txtColorPanel;
         private TextBox txtColorFondo;
+        private Label lblTemaTitulo;
+        private Label lblTemaPrimario;
+        private Label lblTemaPanel;
+        private Label lblTemaFondo;
+        private Button btnTemaPrimario;
+        private Button btnTemaPanel;
+        private Button btnTemaFondo;
         private DataGridView gridSecuencias;
         private Label lblServidorSecundarias;
         private TextBox txtServidorSecundarias;
@@ -83,7 +90,7 @@ namespace SistemaFerreteriaV8
         }
         private void InicializarSeccionTema()
         {
-            var tituloTema = new Label
+            lblTemaTitulo = new Label
             {
                 Text = "Personalización de colores:",
                 ForeColor = Color.White,
@@ -96,24 +103,48 @@ namespace SistemaFerreteriaV8
             txtColorPanel = CrearTextColor(new Point(160, 268));
             txtColorFondo = CrearTextColor(new Point(160, 300));
 
-            var lblPrimario = CrearLabelColor("Primario:", new Point(18, 239));
-            var lblPanel = CrearLabelColor("Paneles:", new Point(18, 271));
-            var lblFondo = CrearLabelColor("Fondo:", new Point(18, 303));
+            lblTemaPrimario = CrearLabelColor("Primario:", new Point(18, 239));
+            lblTemaPanel = CrearLabelColor("Paneles:", new Point(18, 271));
+            lblTemaFondo = CrearLabelColor("Fondo:", new Point(18, 303));
 
-            Button btnPrimario = CrearBotonColor("Elegir", new Point(290, 234), (s, e) => SeleccionarColor(txtColorPrimario));
-            Button btnPanel = CrearBotonColor("Elegir", new Point(290, 266), (s, e) => SeleccionarColor(txtColorPanel));
-            Button btnFondo = CrearBotonColor("Elegir", new Point(290, 298), (s, e) => SeleccionarColor(txtColorFondo));
+            btnTemaPrimario = CrearBotonColor("Elegir", new Point(290, 234), (s, e) => SeleccionarColor(txtColorPrimario));
+            btnTemaPanel = CrearBotonColor("Elegir", new Point(290, 266), (s, e) => SeleccionarColor(txtColorPanel));
+            btnTemaFondo = CrearBotonColor("Elegir", new Point(290, 298), (s, e) => SeleccionarColor(txtColorFondo));
 
-            groupBox4.Controls.Add(tituloTema);
-            groupBox4.Controls.Add(lblPrimario);
-            groupBox4.Controls.Add(lblPanel);
-            groupBox4.Controls.Add(lblFondo);
+            groupBox4.Controls.Add(lblTemaTitulo);
+            groupBox4.Controls.Add(lblTemaPrimario);
+            groupBox4.Controls.Add(lblTemaPanel);
+            groupBox4.Controls.Add(lblTemaFondo);
             groupBox4.Controls.Add(txtColorPrimario);
             groupBox4.Controls.Add(txtColorPanel);
             groupBox4.Controls.Add(txtColorFondo);
-            groupBox4.Controls.Add(btnPrimario);
-            groupBox4.Controls.Add(btnPanel);
-            groupBox4.Controls.Add(btnFondo);
+            groupBox4.Controls.Add(btnTemaPrimario);
+            groupBox4.Controls.Add(btnTemaPanel);
+            groupBox4.Controls.Add(btnTemaFondo);
+        }
+
+        private void InicializarSeccionServidorSecundarias()
+        {
+            lblServidorSecundarias = new Label
+            {
+                Text = "Dirección para secundarias:",
+                ForeColor = Color.White,
+                Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
+                AutoSize = true
+            };
+
+            txtServidorSecundarias = new TextBox
+            {
+                ReadOnly = true,
+                BackColor = Color.FromArgb(243, 244, 246),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
+            };
+
+            groupBox4.Controls.Add(lblServidorSecundarias);
+            groupBox4.Controls.Add(txtServidorSecundarias);
+
+            Server.TextChanged += (_, __) => ActualizarDireccionSecundarias();
         }
 
         private void InicializarSeccionServidorSecundarias()
@@ -253,22 +284,38 @@ namespace SistemaFerreteriaV8
 
             Server.Location = new Point(145, 35);
             Server.Size = new Size(210, 25);
+            label5.Location = new Point(13, 34);
             button3.Location = new Point(370, 30);
             button3.Size = new Size(120, 34);
-            lblServidorSecundarias.Location = new Point(18, 72);
-            txtServidorSecundarias.Location = new Point(18, 96);
+            lblServidorSecundarias.Location = new Point(18, 70);
+            txtServidorSecundarias.Location = new Point(18, 92);
             txtServidorSecundarias.Size = new Size(groupBox4.Width - 36, 24);
-            comboBoxImpresoras.Location = new Point(213, 75);
+            label6.Location = new Point(13, 126);
+            comboBoxImpresoras.Location = new Point(213, 126);
             comboBoxImpresoras.Size = new Size(277, 25);
-            comboBox1.Location = new Point(160, 112);
+            label11.Location = new Point(13, 162);
+            comboBox1.Location = new Point(160, 162);
             comboBox1.Size = new Size(140, 25);
-            FontSize.Location = new Point(186, 156);
+            label19.Location = new Point(13, 198);
+            FontSize.Location = new Point(186, 198);
             FontSize.Size = new Size(105, 25);
-            button4.Location = new Point(groupBox4.Width - 145, 235);
-            button5.Location = new Point(groupBox4.Width - 145, 270);
+            int yTema = 236;
+            lblTemaTitulo.Location = new Point(18, yTema);
+            lblTemaPrimario.Location = new Point(18, yTema + 33);
+            lblTemaPanel.Location = new Point(18, yTema + 65);
+            lblTemaFondo.Location = new Point(18, yTema + 97);
+            txtColorPrimario.Location = new Point(160, yTema + 30);
+            txtColorPanel.Location = new Point(160, yTema + 62);
+            txtColorFondo.Location = new Point(160, yTema + 94);
+            btnTemaPrimario.Location = new Point(290, yTema + 28);
+            btnTemaPanel.Location = new Point(290, yTema + 60);
+            btnTemaFondo.Location = new Point(290, yTema + 92);
+
+            button4.Location = new Point(groupBox4.Width - 145, yTema + 24);
+            button5.Location = new Point(groupBox4.Width - 145, yTema + 59);
             button4.Size = button5.Size = new Size(125, 30);
-            pictureBoxIcono.Location = new Point(groupBox4.Width - 113, 168);
-            pictureBox1.Location = new Point(groupBox4.Width - 113, 101);
+            pictureBoxIcono.Location = new Point(groupBox4.Width - 113, yTema - 2);
+            pictureBox1.Location = new Point(groupBox4.Width - 113, yTema + 33);
             pictureBoxIcono.Size = pictureBox1.Size = new Size(72, 50);
 
             if (gridSecuencias != null)
