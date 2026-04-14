@@ -35,13 +35,28 @@ namespace SistemaFerreteriaV8
         {
             InitializeComponent();
             AutoScroll = true;
-            MinimumSize = new Size(1100, 720);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            MinimumSize = new Size(860, 620);
             InicializarSeccionTema();
             InicializarGridSecuencias();
             InicializarSeccionServidorSecundaria();
             AplicarTemaVisualUniforme();
+            ConfigurarAdaptacionPantalla();
             OrganizarLayoutConfiguraciones();
             Resize += (_, __) => OrganizarLayoutConfiguraciones();
+        }
+        private void ConfigurarAdaptacionPantalla()
+        {
+            var area = Screen.FromControl(this).WorkingArea;
+
+            if (area.Width < 1200 || area.Height < 760)
+            {
+                WindowState = FormWindowState.Maximized;
+            }
+
+            AutoScrollMinSize = new Size(
+                Math.Max(840, area.Width - 30),
+                Math.Max(600, area.Height - 60));
         }
         private void InicializarGridSecuencias()
         {
@@ -236,20 +251,21 @@ namespace SistemaFerreteriaV8
         }
         private void OrganizarLayoutConfiguraciones()
         {
+            SuspendLayout();
             int margen = 20;
-            int anchoTotal = Math.Max(980, ClientSize.Width - (margen * 2));
-            int altoTotal = Math.Max(620, ClientSize.Height - 24);
+            int anchoTotal = Math.Max(820, ClientSize.Width - (margen * 2));
+            int altoTotal = Math.Max(560, ClientSize.Height - 24);
 
             groupBox1.Location = new Point(margen, 12);
             groupBox1.Size = new Size(anchoTotal, altoTotal);
 
-            int mitad = (groupBox1.Width - 42) / 2;
+            int mitad = Math.Max(380, (groupBox1.Width - 42) / 2);
             groupBox2.Location = new Point(16, 30);
             groupBox2.Size = new Size(mitad, 255);
             groupBox4.Location = new Point(16, 290);
-            groupBox4.Size = new Size(mitad, groupBox1.Height - 304);
+            groupBox4.Size = new Size(mitad, Math.Max(220, groupBox1.Height - 304));
             groupBox3.Location = new Point(groupBox2.Right + 14, 30);
-            groupBox3.Size = new Size(groupBox1.Width - groupBox2.Width - 46, groupBox1.Height - 150);
+            groupBox3.Size = new Size(Math.Max(300, groupBox1.Width - groupBox2.Width - 46), Math.Max(320, groupBox1.Height - 150));
 
             label10.Location = new Point(120, 372);
             FechaMaxima.Location = new Point(235, 372);
@@ -301,6 +317,7 @@ namespace SistemaFerreteriaV8
                 label10.Location = new Point(Math.Max(16, (groupBox3.Width / 2) - 120), groupBox3.Height - 82);
                 FechaMaxima.Location = new Point(label10.Right + 8, groupBox3.Height - 84);
             }
+            ResumeLayout(true);
         }
         private Color ParseColor(string colorHex, Color fallback)
         {
