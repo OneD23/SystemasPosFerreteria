@@ -120,7 +120,39 @@ namespace SistemaFerreteriaV8.Clases
         [BsonElement("gastoMensual")]
         public double GastoMensual { get; set; }
 
-        IMongoCollection<Configuraciones> Collection = new MongoClient(new OneKeys().URI).GetDatabase(new OneKeys().DatabaseName).GetCollection<Configuraciones>("configuraciones");
+        private static readonly object _syncConnectionError = new();
+        private static DateTime _lastConnectionErrorAt = DateTime.MinValue;
+        IMongoCollection<Configuraciones> Collection = CrearColeccion();
+
+        private static IMongoCollection<Configuraciones> CrearColeccion()
+        {
+            var settings = MongoClientSettings.FromConnectionString(new OneKeys().URI);
+            settings.ServerSelectionTimeout = TimeSpan.FromSeconds(2);
+            settings.ConnectTimeout = TimeSpan.FromSeconds(2);
+            settings.SocketTimeout = TimeSpan.FromSeconds(3);
+
+            var client = new MongoClient(settings);
+            return client
+                .GetDatabase(new OneKeys().DatabaseName)
+                .GetCollection<Configuraciones>("configuraciones");
+        }
+
+        private static void MostrarErrorConexionUnaVez(string mensaje, string titulo, System.Windows.Forms.MessageBoxIcon icono)
+        {
+            lock (_syncConnectionError)
+            {
+                var ahora = DateTime.UtcNow;
+                if ((ahora - _lastConnectionErrorAt).TotalSeconds < 20)
+                    return;
+
+                _lastConnectionErrorAt = ahora;
+                System.Windows.Forms.MessageBox.Show(
+                    mensaje,
+                    titulo,
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    icono);
+            }
+        }
 
 
        
@@ -156,33 +188,30 @@ namespace SistemaFerreteriaV8.Clases
             }
             catch (MongoDB.Driver.MongoConnectionException ex)
             {
-                System.Windows.Forms.MessageBox.Show(
+                MostrarErrorConexionUnaVez(
                     "No se pudo conectar a la base de datos MongoDB.\n\n" +
                     "Verifica que el servidor esté corriendo y la cadena de conexión sea correcta.\n\n" +
                     "Detalles técnicos:\n" + ex.Message,
                     "Error de conexión",
-                    System.Windows.Forms.MessageBoxButtons.OK,
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
             }
             catch (TimeoutException ex)
             {
-                System.Windows.Forms.MessageBox.Show(
+                MostrarErrorConexionUnaVez(
                     "Tiempo de espera agotado al intentar conectar con la base de datos.\n\n" +
                     "Revisa la conexión o el estado de MongoDB.\n\n" +
                     "Detalles:\n" + ex.Message,
                     "Error de tiempo de espera",
-                    System.Windows.Forms.MessageBoxButtons.OK,
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show(
+                MostrarErrorConexionUnaVez(
                     "Ocurrió un error inesperado al consultar la base de datos:\n\n" +
                     ex.Message,
                     "Error inesperado",
-                    System.Windows.Forms.MessageBoxButtons.OK,
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
             }
