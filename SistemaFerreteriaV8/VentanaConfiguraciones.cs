@@ -575,33 +575,46 @@ namespace SistemaFerreteriaV8
 
         private void ActualizarDireccionSecundarias()
         {
-            var host = (Server.Text ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(host))
-                host = ExtraerHostDesdeUri(new OneKeys().URI);
+            var dbName = (new OneKeys().DatabaseName ?? string.Empty).Trim();
+            var uriBase = ConstruirUriSecundaria((Server.Text ?? string.Empty).Trim(), new OneKeys().URI);
+            txtServidorSecundarias.Text = string.IsNullOrWhiteSpace(dbName)
+                ? uriBase
+                : $"{uriBase}{dbName}";
+        }
+
+        private static string ConstruirUriSecundaria(string serverInput, string fallbackUri)
+        {
+            var origen = string.IsNullOrWhiteSpace(serverInput) ? fallbackUri : serverInput;
+            if (string.IsNullOrWhiteSpace(origen))
+                return "mongodb://localhost:27017/";
+
+            var limpio = origen.Trim();
+            if (!limpio.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+                limpio = $"mongodb://{limpio}";
+
+            limpio = limpio.Replace("mongodb://mongodb://", "mongodb://", StringComparison.OrdinalIgnoreCase);
+
+            var sinPrefijo = limpio.Substring("mongodb://".Length);
+            var slash = sinPrefijo.IndexOf('/');
+            if (slash >= 0)
+                sinPrefijo = sinPrefijo.Substring(0, slash);
+
+            var host = sinPrefijo;
+            var port = "27017";
+
+            var dosPuntos = sinPrefijo.LastIndexOf(':');
+            if (dosPuntos > 0)
+            {
+                host = sinPrefijo.Substring(0, dosPuntos);
+                var posiblePuerto = sinPrefijo.Substring(dosPuntos + 1);
+                if (int.TryParse(posiblePuerto, out _))
+                    port = posiblePuerto;
+            }
 
             if (string.IsNullOrWhiteSpace(host))
                 host = "localhost";
 
-            txtServidorSecundarias.Text = $"mongodb://{host}:27017/";
-        }
-
-        private static string ExtraerHostDesdeUri(string uri)
-        {
-            if (string.IsNullOrWhiteSpace(uri))
-                return string.Empty;
-
-            var limpio = uri.Trim();
-            if (limpio.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
-                limpio = limpio.Substring("mongodb://".Length);
-
-            var slash = limpio.IndexOf('/');
-            if (slash >= 0)
-                limpio = limpio.Substring(0, slash);
-
-            if (limpio.Contains(':'))
-                limpio = limpio.Split(':')[0];
-
-            return limpio;
+            return $"mongodb://{host}:{port}/";
         }
         private void CargarGridSecuenciasDesdeConfiguracion(Configuraciones config)
         {
