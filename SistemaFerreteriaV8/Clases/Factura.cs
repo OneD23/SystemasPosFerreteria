@@ -134,22 +134,29 @@ namespace SistemaFerreteriaV8.Clases
             }
         }
 
-        // Secuenciador atómico para Ids correlativos
         private static int GetNextSequenceValue(string name)
         {
-            var counterCollection = new MongoClient(new OneKeys().URI)
-                .GetDatabase(new OneKeys().DatabaseName)
-                .GetCollection<BsonDocument>("counters");
+            // Mantiene firma para compatibilidad, pero ahora calcula el siguiente Id
+            // según el último Id realmente persistido en facturas.
+            return GetNextInvoiceIdFromCollection();
+        }
 
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", name);
-            var update = Builders<BsonDocument>.Update.Inc("seq", 1);
-            var options = new FindOneAndUpdateOptions<BsonDocument>
+        private static int GetNextInvoiceIdFromCollection()
+        {
+            try
             {
-                ReturnDocument = ReturnDocument.After,
-                IsUpsert = true
-            };
-            var result = counterCollection.FindOneAndUpdate(filter, update, options);
-            return result["seq"].AsInt32;
+                var ultimoId = collection
+                    .Find(Builders<Factura>.Filter.Empty)
+                    .Sort(Builders<Factura>.Sort.Descending(f => f.Id))
+                    .Project(f => f.Id)
+                    .FirstOrDefault();
+
+                return ultimoId > 0 ? ultimoId + 1 : 1;
+            }
+            catch
+            {
+                return 1;
+            }
         }
 
         public Factura()

@@ -188,8 +188,10 @@ namespace SistemaFerreteriaV8.Clases
 
         public void ImprimirTiket(string stringimpresora)
         {
-
-            RawPrinterHelper.SendStringToPrinter(stringimpresora, line.ToString());
+            var feed = "\n\n\n";
+            // ESC d n (alimenta n líneas) + GS V m (corte)
+            var comandoCorte = $"{(char)27}d{(char)3}{(char)29}V{(char)66}{(char)0}";
+            RawPrinterHelper.SendStringToPrinter(stringimpresora, line.ToString() + feed + comandoCorte);
 
             line = new StringBuilder();
 
