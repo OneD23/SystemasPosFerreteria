@@ -22,6 +22,8 @@ namespace SistemaFerreteriaV8
         private TextBox txtColorPanel;
         private TextBox txtColorFondo;
         private DataGridView gridSecuencias;
+        private Label lblServidorSecundarias;
+        private TextBox txtServidorSecundarias;
         public VentanaConfiguraciones()
         {
             InitializeComponent();
@@ -29,6 +31,7 @@ namespace SistemaFerreteriaV8
             MinimumSize = new Size(1100, 720);
             InicializarSeccionTema();
             InicializarGridSecuencias();
+            InicializarSeccionServidorSecundarias();
             AplicarTemaVisualUniforme();
             OrganizarLayoutConfiguraciones();
             Resize += (_, __) => OrganizarLayoutConfiguraciones();
@@ -111,6 +114,30 @@ namespace SistemaFerreteriaV8
             groupBox4.Controls.Add(btnPrimario);
             groupBox4.Controls.Add(btnPanel);
             groupBox4.Controls.Add(btnFondo);
+        }
+
+        private void InicializarSeccionServidorSecundarias()
+        {
+            lblServidorSecundarias = new Label
+            {
+                Text = "Dirección para secundarias:",
+                ForeColor = Color.White,
+                Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
+                AutoSize = true
+            };
+
+            txtServidorSecundarias = new TextBox
+            {
+                ReadOnly = true,
+                BackColor = Color.FromArgb(243, 244, 246),
+                ForeColor = Color.FromArgb(15, 23, 42),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
+            };
+
+            groupBox4.Controls.Add(lblServidorSecundarias);
+            groupBox4.Controls.Add(txtServidorSecundarias);
+
+            Server.TextChanged += (_, __) => ActualizarDireccionSecundarias();
         }
         private void AplicarTemaVisualUniforme()
         {
@@ -228,6 +255,9 @@ namespace SistemaFerreteriaV8
             Server.Size = new Size(210, 25);
             button3.Location = new Point(370, 30);
             button3.Size = new Size(120, 34);
+            lblServidorSecundarias.Location = new Point(18, 72);
+            txtServidorSecundarias.Location = new Point(18, 96);
+            txtServidorSecundarias.Size = new Size(groupBox4.Width - 36, 24);
             comboBoxImpresoras.Location = new Point(213, 75);
             comboBoxImpresoras.Size = new Size(277, 25);
             comboBox1.Location = new Point(160, 112);
@@ -440,6 +470,7 @@ namespace SistemaFerreteriaV8
         private void button3_Click(object sender, EventArgs e)
         {
             Server.Text = "";
+            ActualizarDireccionSecundarias();
         }
         private async void VentanaConfiguraciones_Load(object sender, EventArgs e)
         {
@@ -483,6 +514,7 @@ namespace SistemaFerreteriaV8
                 AplicarPreviewColor(txtColorPrimario);
                 AplicarPreviewColor(txtColorPanel);
                 AplicarPreviewColor(txtColorFondo);
+                ActualizarDireccionSecundarias();
 
                 if (config.Icono != null)
                 {
@@ -539,6 +571,50 @@ namespace SistemaFerreteriaV8
                 }         
 
             }
+        }
+
+        private void ActualizarDireccionSecundarias()
+        {
+            var dbName = (new OneKeys().DatabaseName ?? string.Empty).Trim();
+            var uriBase = ConstruirUriSecundaria((Server.Text ?? string.Empty).Trim(), new OneKeys().URI);
+            txtServidorSecundarias.Text = string.IsNullOrWhiteSpace(dbName)
+                ? uriBase
+                : $"{uriBase}{dbName}";
+        }
+
+        private static string ConstruirUriSecundaria(string serverInput, string fallbackUri)
+        {
+            var origen = string.IsNullOrWhiteSpace(serverInput) ? fallbackUri : serverInput;
+            if (string.IsNullOrWhiteSpace(origen))
+                return "mongodb://localhost:27017/";
+
+            var limpio = origen.Trim();
+            if (!limpio.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+                limpio = $"mongodb://{limpio}";
+
+            limpio = limpio.Replace("mongodb://mongodb://", "mongodb://", StringComparison.OrdinalIgnoreCase);
+
+            var sinPrefijo = limpio.Substring("mongodb://".Length);
+            var slash = sinPrefijo.IndexOf('/');
+            if (slash >= 0)
+                sinPrefijo = sinPrefijo.Substring(0, slash);
+
+            var host = sinPrefijo;
+            var port = "27017";
+
+            var dosPuntos = sinPrefijo.LastIndexOf(':');
+            if (dosPuntos > 0)
+            {
+                host = sinPrefijo.Substring(0, dosPuntos);
+                var posiblePuerto = sinPrefijo.Substring(dosPuntos + 1);
+                if (int.TryParse(posiblePuerto, out _))
+                    port = posiblePuerto;
+            }
+
+            if (string.IsNullOrWhiteSpace(host))
+                host = "localhost";
+
+            return $"mongodb://{host}:{port}/";
         }
         private void CargarGridSecuenciasDesdeConfiguracion(Configuraciones config)
         {
