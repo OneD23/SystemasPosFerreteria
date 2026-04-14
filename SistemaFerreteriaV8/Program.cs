@@ -61,6 +61,7 @@ namespace SistemaFerreteriaV8
                 return false;
 
             var localIps = string.Join(", ", GetLocalIPv4());
+            var defaultMongoUri = AppInstanceSettings.GetDefaultMongoUri();
             string hostOrIp;
             string nodeRole;
 
@@ -68,15 +69,15 @@ namespace SistemaFerreteriaV8
             {
                 nodeRole = "Primary";
                 hostOrIp = Prompt(
-                    "Host/IP donde corre MongoDB en esta PC (ej: localhost o 192.168.1.20):\n\nIPs detectadas: " + localIps,
+                    "Host/IP o URI de MongoDB en esta PC (ej: 192.168.1.20 o mongodb://192.168.1.20:27017/cafeteria_do_a_alba):\n\nIPs detectadas: " + localIps,
                     "Servidor principal",
-                    "localhost");
+                    defaultMongoUri);
             }
             else
             {
                 nodeRole = "Secondary";
                 hostOrIp = Prompt(
-                    "IP/Host de la PC PRINCIPAL donde corre MongoDB (ej: 192.168.1.20):",
+                    "IP/Host o URI de la PC PRINCIPAL donde corre MongoDB (ej: 192.168.1.20 o mongodb://192.168.1.20:27017/cafeteria_do_a_alba):",
                     "Servidor secundario",
                     "");
             }
@@ -87,7 +88,7 @@ namespace SistemaFerreteriaV8
                 return false;
             }
 
-            var mongoUri = $"mongodb://{hostOrIp.Trim()}:27017/";
+            var mongoUri = BuildMongoUri(hostOrIp, defaultMongoUri);
             var databaseName = OneKeys.BuildDatabaseName(company);
 
             if (!TryValidateMongoConnection(mongoUri))
@@ -137,6 +138,23 @@ namespace SistemaFerreteriaV8
             {
                 return false;
             }
+        }
+
+        private static string BuildMongoUri(string value, string defaultMongoUri)
+        {
+            var clean = (value ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(clean))
+                return string.IsNullOrWhiteSpace(defaultMongoUri)
+                    ? AppInstanceSettings.GetDefaultMongoUri()
+                    : defaultMongoUri;
+
+            if (clean.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
+                return clean;
+
+            if (clean.Contains(":"))
+                return $"mongodb://{clean}/cafeteria_do_a_alba";
+
+            return $"mongodb://{clean}:27017/cafeteria_do_a_alba";
         }
 
         private static IEnumerable<string> GetLocalIPv4()
