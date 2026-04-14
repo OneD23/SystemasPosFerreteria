@@ -46,6 +46,12 @@
             label14 = new Label();
             BarraDeCarga = new ProgressBar();
             ListaDeCompras = new DataGridView();
+            Nombre = new DataGridViewTextBoxColumn();
+            Descripcion1 = new DataGridViewTextBoxColumn();
+            Marca = new DataGridViewTextBoxColumn();
+            Precio = new DataGridViewTextBoxColumn();
+            Cantidad = new DataGridViewTextBoxColumn();
+            SubTotal1 = new DataGridViewTextBoxColumn();
             BuscarPorNombreBox = new GroupBox();
             ListaProductos = new DataGridView();
             Column5 = new DataGridViewTextBoxColumn();
@@ -90,12 +96,6 @@
             label7 = new Label();
             groupBox4 = new GroupBox();
             timer1 = new System.Windows.Forms.Timer(components);
-            Nombre = new DataGridViewTextBoxColumn();
-            Descripcion1 = new DataGridViewTextBoxColumn();
-            Marca = new DataGridViewTextBoxColumn();
-            Precio = new DataGridViewTextBoxColumn();
-            Cantidad = new DataGridViewTextBoxColumn();
-            SubTotal1 = new DataGridViewTextBoxColumn();
             Opciones.SuspendLayout();
             groupBox1.SuspendLayout();
             PanelDeCarga.SuspendLayout();
@@ -364,6 +364,45 @@
             ListaDeCompras.CellDoubleClick += ListaDeCompras_CellDoubleClick;
             ListaDeCompras.CellEndEdit += ListaDeCompras_CellEndEdit;
             // 
+            // Nombre
+            // 
+            Nombre.HeaderText = "Nombre";
+            Nombre.Name = "Nombre";
+            Nombre.ReadOnly = true;
+            Nombre.Width = 250;
+            // 
+            // Descripcion1
+            // 
+            Descripcion1.HeaderText = "Descripcion";
+            Descripcion1.Name = "Descripcion1";
+            Descripcion1.ReadOnly = true;
+            Descripcion1.Width = 200;
+            // 
+            // Marca
+            // 
+            Marca.HeaderText = "Marca";
+            Marca.Name = "Marca";
+            Marca.ReadOnly = true;
+            Marca.Width = 200;
+            // 
+            // Precio
+            // 
+            Precio.HeaderText = "Precio";
+            Precio.Name = "Precio";
+            Precio.ReadOnly = true;
+            Precio.Resizable = DataGridViewTriState.True;
+            // 
+            // Cantidad
+            // 
+            Cantidad.HeaderText = "Cantidad";
+            Cantidad.Name = "Cantidad";
+            // 
+            // SubTotal1
+            // 
+            SubTotal1.HeaderText = "Total";
+            SubTotal1.Name = "SubTotal1";
+            SubTotal1.ReadOnly = true;
+            // 
             // BuscarPorNombreBox
             // 
             BuscarPorNombreBox.BackColor = Color.Black;
@@ -371,7 +410,7 @@
             BuscarPorNombreBox.Controls.Add(NombreABuscar);
             BuscarPorNombreBox.Controls.Add(label10);
             BuscarPorNombreBox.ForeColor = Color.White;
-            BuscarPorNombreBox.Location = new Point(0, 1);
+            BuscarPorNombreBox.Location = new Point(166, 1);
             BuscarPorNombreBox.Margin = new Padding(4, 3, 4, 3);
             BuscarPorNombreBox.Name = "BuscarPorNombreBox";
             BuscarPorNombreBox.Padding = new Padding(4, 3, 4, 3);
@@ -892,45 +931,6 @@
             timer1.Enabled = true;
             timer1.Interval = 3000;
             timer1.Tick += timer1_Tick;
-            // 
-            // Nombre
-            // 
-            Nombre.HeaderText = "Nombre";
-            Nombre.Name = "Nombre";
-            Nombre.ReadOnly = true;
-            Nombre.Width = 250;
-            // 
-            // Descripcion1
-            // 
-            Descripcion1.HeaderText = "Descripcion";
-            Descripcion1.Name = "Descripcion1";
-            Descripcion1.ReadOnly = true;
-            Descripcion1.Width = 200;
-            // 
-            // Marca
-            // 
-            Marca.HeaderText = "Marca";
-            Marca.Name = "Marca";
-            Marca.ReadOnly = true;
-            Marca.Width = 200;
-            // 
-            // Precio
-            // 
-            Precio.HeaderText = "Precio";
-            Precio.Name = "Precio";
-            Precio.ReadOnly = true;
-            Precio.Resizable = DataGridViewTriState.True;
-            // 
-            // Cantidad
-            // 
-            Cantidad.HeaderText = "Cantidad";
-            Cantidad.Name = "Cantidad";
-            // 
-            // SubTotal1
-            // 
-            SubTotal1.HeaderText = "Total";
-            SubTotal1.Name = "SubTotal1";
-            SubTotal1.ReadOnly = true;
             // 
             // VentanaVentas
             // 
