@@ -146,30 +146,6 @@ namespace SistemaFerreteriaV8
 
             Server.TextChanged += (_, __) => ActualizarDireccionSecundarias();
         }
-
-        private void InicializarSeccionServidorSecundarias()
-        {
-            lblServidorSecundarias = new Label
-            {
-                Text = "Dirección para secundarias:",
-                ForeColor = Color.White,
-                Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
-                AutoSize = true
-            };
-
-            txtServidorSecundarias = new TextBox
-            {
-                ReadOnly = true,
-                BackColor = Color.FromArgb(243, 244, 246),
-                ForeColor = Color.FromArgb(15, 23, 42),
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Regular)
-            };
-
-            groupBox4.Controls.Add(lblServidorSecundarias);
-            groupBox4.Controls.Add(txtServidorSecundarias);
-
-            Server.TextChanged += (_, __) => ActualizarDireccionSecundarias();
-        }
         private void AplicarTemaVisualUniforme()
         {
             Configuraciones config = new Configuraciones().ObtenerPorId(1);

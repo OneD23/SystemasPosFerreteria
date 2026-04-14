@@ -744,7 +744,7 @@ namespace SistemaFerreteriaV8
             if (!esCargada)
             {
                 Hora.Text = DateTime.Now.ToShortTimeString();
-                if (facturaActiva != null)
+                if (facturaActiva != null && facturaActiva.Id > 0)
                     NoFactura.Text = facturaActiva.Id.ToString();
             }
         }
