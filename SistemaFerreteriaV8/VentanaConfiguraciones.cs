@@ -38,7 +38,7 @@ namespace SistemaFerreteriaV8
             MinimumSize = new Size(1100, 720);
             InicializarSeccionTema();
             InicializarGridSecuencias();
-            InicializarSeccionServidorSecundarias();
+            InicializarSeccionServidorSecundaria();
             AplicarTemaVisualUniforme();
             OrganizarLayoutConfiguraciones();
             Resize += (_, __) => OrganizarLayoutConfiguraciones();
@@ -123,7 +123,7 @@ namespace SistemaFerreteriaV8
             groupBox4.Controls.Add(btnTemaFondo);
         }
 
-        private void InicializarSeccionServidorSecundarias()
+        private void InicializarSeccionServidorSecundaria()
         {
             lblServidorSecundarias = new Label
             {
