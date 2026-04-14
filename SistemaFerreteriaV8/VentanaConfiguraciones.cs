@@ -609,7 +609,7 @@ namespace SistemaFerreteriaV8
         {
             var origen = string.IsNullOrWhiteSpace(serverInput) ? fallbackUri : serverInput;
             if (string.IsNullOrWhiteSpace(origen))
-                return "mongodb://localhost:27017/";
+                origen = AppInstanceSettings.GetDefaultMongoUri();
 
             var limpio = origen.Trim();
             if (!limpio.StartsWith("mongodb://", StringComparison.OrdinalIgnoreCase))
@@ -635,7 +635,7 @@ namespace SistemaFerreteriaV8
             }
 
             if (string.IsNullOrWhiteSpace(host))
-                host = "localhost";
+                host = "127.0.0.1";
 
             return $"mongodb://{host}:{port}/";
         }
