@@ -132,9 +132,23 @@ namespace SistemaFerreteriaV8
 
             EstilizarGrid(ListaDeCompras);
             EstilizarGrid(ListaProductos);
+            AsegurarColumnasBusqueda();
 
             Aviso.Visible = false;
             statusTimer.Tick += (_, _) => { Aviso.Visible = false; statusTimer.Stop(); };
+        }
+
+        private void AsegurarColumnasBusqueda()
+        {
+            if (ListaProductos.Columns.Count == 4) return;
+
+            ListaProductos.Columns.Clear();
+            ListaProductos.Columns.Add("Id", "Id");
+            ListaProductos.Columns.Add("Nombre", "Nombre");
+            ListaProductos.Columns.Add("Marca", "Marca");
+            ListaProductos.Columns.Add("Precio", "Precio");
+            ListaProductos.ReadOnly = true;
+            ListaProductos.RowHeadersVisible = false;
         }
 
         private void AjustarLayoutBusquedaPorNombre()
@@ -1412,6 +1426,7 @@ namespace SistemaFerreteriaV8
         {
             _searchDebounceTimer.Stop();
             var requestVersion = ++_searchRequestVersion;
+            AsegurarColumnasBusqueda();
             ListaProductos.Rows.Clear();
 
             var term = NombreABuscar.Text?.Trim().ToLower();
