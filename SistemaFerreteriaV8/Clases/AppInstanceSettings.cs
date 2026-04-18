@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -11,7 +14,7 @@ namespace SistemaFerreteriaV8.Clases
         public bool IsConfigured { get; set; }
         public string CompanyName { get; set; } = "";
         public string DatabaseName { get; set; } = "";
-        public string MongoUri { get; set; } = "mongodb://localhost:27017/";
+        public string MongoUri { get; set; } = GetDefaultMongoUri();
         public string NodeRole { get; set; } = "Primary";
 
         public static string SettingsFilePath => Path.Combine(
@@ -95,7 +98,7 @@ namespace SistemaFerreteriaV8.Clases
         private static string Decrypt(string cipherText)
         {
             if (string.IsNullOrWhiteSpace(cipherText))
-                return "mongodb://localhost:27017/";
+                return GetDefaultMongoUri();
 
             try
             {
@@ -105,12 +108,34 @@ namespace SistemaFerreteriaV8.Clases
             }
             catch (CryptographicException)
             {
-                return "mongodb://localhost:27017/";
+                return GetDefaultMongoUri();
             }
             catch (FormatException)
             {
-                return "mongodb://localhost:27017/";
+                return GetDefaultMongoUri();
             }
+        }
+
+        public static string GetDefaultMongoUri()
+        {
+            const string suffix = ":27017/cafeteria_do_a_alba";
+            try
+            {
+                var ip = Dns.GetHostEntry(Dns.GetHostName())
+                    .AddressList
+                    .FirstOrDefault(a =>
+                        a.AddressFamily == AddressFamily.InterNetwork &&
+                        !IPAddress.IsLoopback(a));
+
+                if (ip != null)
+                    return $"mongodb://{ip}{suffix}";
+            }
+            catch
+            {
+                // fallback below
+            }
+
+            return $"mongodb://127.0.0.1{suffix}";
         }
     }
 }
