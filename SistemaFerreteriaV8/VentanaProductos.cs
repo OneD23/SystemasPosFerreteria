@@ -315,18 +315,16 @@ namespace SistemaFerreteriaV8
             var cliente = new MongoClient(new OneKeys().URI);
             var database = cliente.GetDatabase(new OneKeys().DatabaseName);
             var coleccion = database.GetCollection<BsonDocument>("Productos");
+            totalProductos = (int)coleccion.CountDocuments(FilterDefinition<BsonDocument>.Empty);
+            int paginaTotal = Math.Max(1, (int)Math.Ceiling((double)totalProductos / productosPorPagina));
+            int maxPaginaIndex = Math.Max(0, paginaTotal - 1);
 
             // Ajustar la página actual según la acción
             if (accion.ToLower() == "iniciar")
             {
-                // Solo calcular el total al inicio una sola vez
-                if (totalProductos == 0)
-                {
-                    totalProductos = (int)coleccion.CountDocuments(FilterDefinition<BsonDocument>.Empty);
-                }
                 paginaActual = 0; // Resetear a la primera página
             }
-            else if (accion.ToLower() == "avanza" && paginaActual < 1-(int)Math.Ceiling((double)totalProductos / productosPorPagina))
+            else if (accion.ToLower() == "avanza" && paginaActual < maxPaginaIndex)
             {
                 paginaActual++;
             }
@@ -334,6 +332,8 @@ namespace SistemaFerreteriaV8
             {
                 paginaActual--;
             }
+
+            paginaActual = Math.Max(0, Math.Min(paginaActual, maxPaginaIndex));
 
             // Calcular el salto y el límite para la paginación
             int salto = paginaActual * productosPorPagina;
@@ -381,7 +381,6 @@ namespace SistemaFerreteriaV8
             }
 
             // Mostrar la información de la paginación
-            int paginaTotal = (int)Math.Ceiling((double)totalProductos / productosPorPagina);
             Lugar.Text = $"Página {paginaActual + 1} de {paginaTotal}";
         }
 

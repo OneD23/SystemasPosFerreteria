@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using Microsoft.VisualBasic;
+using SistemaFerreteriaV8.Clases.Fiscal;
 
 namespace SistemaFerreteriaV8.Clases
 {
@@ -126,6 +127,24 @@ namespace SistemaFerreteriaV8.Clases
             }
 
             await File.WriteAllTextAsync(rutaArchivo, sb.ToString(), Encoding.UTF8);
+        }
+
+        /// <summary>
+        /// Exporta un preformato de reporte fiscal 607 (DGII, ventas) en CSV.
+        /// </summary>
+        public async Task<string> ExportarReporteFiscal607CsvAsync(DateTime fecha1, DateTime fecha2, string carpetaSalida, string rncEmisor)
+        {
+            var fiscalReportService = new FiscalReportService();
+            return await fiscalReportService.ExportarReporte607CsvAsync(fecha1, fecha2, carpetaSalida, rncEmisor);
+        }
+
+        /// <summary>
+        /// Exporta un preformato de reporte fiscal 608 (DGII, anulaciones) en CSV.
+        /// </summary>
+        public async Task<string> ExportarReporteFiscal608CsvAsync(DateTime fecha1, DateTime fecha2, string carpetaSalida, string rncEmisor)
+        {
+            var fiscalReportService = new FiscalReportService();
+            return await fiscalReportService.ExportarReporte608CsvAsync(fecha1, fecha2, carpetaSalida, rncEmisor);
         }
 
         /// <summary>
