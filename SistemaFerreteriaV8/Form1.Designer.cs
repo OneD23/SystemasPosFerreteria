@@ -132,7 +132,7 @@
             // 
             // pictureBox2
             // 
-            pictureBox2.Image = SistemaFerreteriaV8.Properties.Resources.Sin_título_21;
+            pictureBox2.Image = Properties.Resources.Sin_título_21;
             pictureBox2.Location = new Point(8, 17);
             pictureBox2.Margin = new Padding(4, 3, 4, 3);
             pictureBox2.Name = "pictureBox2";
@@ -280,7 +280,7 @@
             // pictureBox1
             // 
             pictureBox1.Anchor = AnchorStyles.None;
-            pictureBox1.Image = SistemaFerreteriaV8.Properties.Resources.Sin_título_31;
+            pictureBox1.Image = Properties.Resources.Sin_título_31;
             pictureBox1.Location = new Point(239, 45);
             pictureBox1.Margin = new Padding(4, 3, 4, 3);
             pictureBox1.Name = "pictureBox1";
@@ -289,10 +289,6 @@
             pictureBox1.TabIndex = 0;
             pictureBox1.TabStop = false;
             pictureBox1.Click += pictureBox1_Click;
-            // 
-            // timer1
-            // 
-            //timer1.Tick += timer1_Tick;
             // 
             // Form1
             // 
