@@ -82,6 +82,7 @@ namespace SistemaFerreteriaV8
 
             button1.Click += async (_, __) => await CambiarPaginaAsync(-1);
             button2.Click += async (_, __) => await CambiarPaginaAsync(1);
+            buttonEliminarPorFecha.Click += async (_, __) => await EliminarFacturasPorFechaAsync();
             Fecha1.ValueChanged += async (_, __) => await ReiniciarYRecargarAsync();
             Fecha2.ValueChanged += async (_, __) => await ReiniciarYRecargarAsync();
         }
@@ -180,6 +181,51 @@ namespace SistemaFerreteriaV8
             finally
             {
                 progressBarLoading.Visible = false;
+            }
+        }
+
+        private async Task EliminarFacturasPorFechaAsync()
+        {
+            var desde = Fecha1.Value.Date;
+            var hasta = Fecha2.Value.Date;
+            if (hasta < desde)
+            {
+                MessageBox.Show("La fecha 'Hasta' no puede ser menor que 'Desde'.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var confirmacion = MessageBox.Show(
+                $"Se eliminarán (lógicamente) las facturas entre {desde:dd/MM/yyyy} y {hasta:dd/MM/yyyy}.\n\n¿Desea continuar?",
+                "Eliminar facturas por fecha",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirmacion != DialogResult.Yes)
+                return;
+
+            buttonEliminarPorFecha.Enabled = false;
+            progressBarLoading.Visible = true;
+            try
+            {
+                int total = await Factura.EliminarPorRangoFechasAsync(
+                    desde,
+                    hasta,
+                    $"Eliminación por rango de fechas ({desde:yyyy-MM-dd} a {hasta:yyyy-MM-dd}) desde VentanaFacturas");
+
+                MessageBox.Show(
+                    total > 0
+                        ? $"Se eliminaron {total} factura(s) dentro del rango."
+                        : "No se encontraron facturas activas para eliminar en ese rango.",
+                    "Eliminar facturas por fecha",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                await ReiniciarYRecargarAsync();
+            }
+            finally
+            {
+                progressBarLoading.Visible = false;
+                buttonEliminarPorFecha.Enabled = true;
             }
         }
 

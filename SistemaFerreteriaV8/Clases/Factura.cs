@@ -221,6 +221,35 @@ namespace SistemaFerreteriaV8.Clases
             await collection.ReplaceOneAsync(f => f.Id == this.Id, this);
         }
 
+        public static async Task<int> EliminarPorRangoFechasAsync(DateTime fechaDesde, DateTime fechaHasta, string motivo, string eliminadoPorId = "", string eliminadoPorNombre = "")
+        {
+            var inicio = fechaDesde.Date;
+            var fin = fechaHasta.Date.AddDays(1).AddTicks(-1);
+
+            var filter = Builders<Factura>.Filter.And(
+                Builders<Factura>.Filter.Gte(f => f.Fecha, inicio),
+                Builders<Factura>.Filter.Lte(f => f.Fecha, fin),
+                Builders<Factura>.Filter.Eq(f => f.Eliminada, false),
+                Builders<Factura>.Filter.Eq(f => f.Cotizacion, false));
+
+            var facturas = await collection.Find(filter).ToListAsync();
+            var totalEliminadas = 0;
+            var motivoFinal = string.IsNullOrWhiteSpace(motivo) ? "Eliminación masiva por rango de fechas" : motivo.Trim();
+
+            foreach (var factura in facturas)
+            {
+                factura.MotivoEliminacion = motivoFinal;
+                factura.EliminadaPorId = eliminadoPorId ?? string.Empty;
+                factura.EliminadaPorNombre = eliminadoPorNombre ?? string.Empty;
+                factura.FechaEliminacion = DateTime.Now;
+
+                await factura.EliminarFacturaAsync();
+                totalEliminadas++;
+            }
+
+            return totalEliminadas;
+        }
+
         private async Task ReponerInventarioPorEliminacionAsync()
         {
             if (Productos == null || !Productos.Any())
