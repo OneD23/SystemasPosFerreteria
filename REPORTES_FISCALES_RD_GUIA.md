@@ -24,10 +24,21 @@ string archivo607 = await reportes.ExportarReporteFiscal607CsvAsync(desde, hasta
 string archivo608 = await reportes.ExportarReporteFiscal608CsvAsync(desde, hasta, carpeta, config?.RNC ?? "");
 ```
 
+## Uso desde la UI (Contabilidad)
+
+En **Contabilidad → Exportación de datos** ahora aparecen:
+- `Exportar reporte fiscal DGII 607`
+- `Exportar reporte fiscal DGII 608`
+
+Flujo:
+1. Seleccionar opción 607 o 608.
+2. Digitar período fiscal en formato `AAAAMM` (ejemplo `202604`).
+3. Elegir carpeta de salida.
+4. El sistema genera el CSV y muestra la ruta final.
+
 ## Notas importantes
 
 - Los archivos se generan como **preformato** para facilitar validación/carga.
 - Columnas de impuestos/retenciones no presentes en el modelo actual se exportan en `0.00`.
 - El campo de anulaciones (608) mapea el motivo de forma básica a un código de tipo de anulación.
 - Antes de envío oficial a DGII, validar contenido y formato según versión vigente de norma/plantilla.
-
