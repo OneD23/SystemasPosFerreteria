@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Microsoft.VisualBasic;
 
 namespace SistemaFerreteriaV8
 {
@@ -104,6 +105,9 @@ namespace SistemaFerreteriaV8
             menuExportacion.Items.Add(CrearOpcionExportacion("Exportar productos", ExportarProductosAsync));
             menuExportacion.Items.Add(CrearOpcionExportacion("Exportar clientes", ExportarClientesAsync));
             menuExportacion.Items.Add(CrearOpcionExportacion("Exportar empleados", ExportarEmpleadosAsync));
+            menuExportacion.Items.Add(new ToolStripSeparator());
+            menuExportacion.Items.Add(CrearOpcionExportacion("Exportar reporte fiscal DGII 607", ExportarReporteFiscal607Async));
+            menuExportacion.Items.Add(CrearOpcionExportacion("Exportar reporte fiscal DGII 608", ExportarReporteFiscal608Async));
         }
 
         private ToolStripMenuItem CrearOpcionExportacion(string texto, Func<Task> accion)
@@ -145,6 +149,83 @@ namespace SistemaFerreteriaV8
             GuardarCsv("empleados_todos.csv",
                 "Id,Nombre,Puesto,Cedula,Telefono,Correo",
                 data.Select(e => $"{Esc(e.Id.ToString())},{Esc(e.Nombre)},{Esc(e.Puesto)},{Esc(e.Cedula)},{Esc(e.Telefono)},{Esc(e.Correo)}"));
+        }
+        private async Task ExportarReporteFiscal607Async()
+        {
+            if (!TryObtenerPeriodoFiscal(out var desde, out var hasta))
+                return;
+
+            var carpeta = SeleccionarCarpetaSalida();
+            if (string.IsNullOrWhiteSpace(carpeta))
+                return;
+
+            var config = new Configuraciones().ObtenerPorId(1);
+            var rncEmisor = config?.RNC ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(rncEmisor))
+            {
+                MessageBox.Show("Debe configurar el RNC de la empresa en Configuraciones antes de exportar el 607.", "Reporte fiscal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var ruta = await new Reportes().ExportarReporteFiscal607CsvAsync(desde, hasta, carpeta, rncEmisor);
+            MessageBox.Show($"Reporte 607 exportado correctamente en:\n{ruta}", "Reporte fiscal", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        private async Task ExportarReporteFiscal608Async()
+        {
+            if (!TryObtenerPeriodoFiscal(out var desde, out var hasta))
+                return;
+
+            var carpeta = SeleccionarCarpetaSalida();
+            if (string.IsNullOrWhiteSpace(carpeta))
+                return;
+
+            var config = new Configuraciones().ObtenerPorId(1);
+            var rncEmisor = config?.RNC ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(rncEmisor))
+            {
+                MessageBox.Show("Debe configurar el RNC de la empresa en Configuraciones antes de exportar el 608.", "Reporte fiscal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var ruta = await new Reportes().ExportarReporteFiscal608CsvAsync(desde, hasta, carpeta, rncEmisor);
+            MessageBox.Show($"Reporte 608 exportado correctamente en:\n{ruta}", "Reporte fiscal", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        private bool TryObtenerPeriodoFiscal(out DateTime desde, out DateTime hasta)
+        {
+            var defaultPeriodo = DateTime.Now.ToString("yyyyMM");
+            var input = Interaction.InputBox(
+                "Digite el período fiscal en formato AAAAMM.\nEjemplo: 202604",
+                "Período fiscal",
+                defaultPeriodo)?.Trim();
+
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                desde = default;
+                hasta = default;
+                return false;
+            }
+
+            if (input.Length != 6 || !int.TryParse(input.Substring(0, 4), out var anio) || !int.TryParse(input.Substring(4, 2), out var mes) || mes < 1 || mes > 12)
+            {
+                MessageBox.Show("Período inválido. Debe usar formato AAAAMM (ej. 202604).", "Reporte fiscal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                desde = default;
+                hasta = default;
+                return false;
+            }
+
+            desde = new DateTime(anio, mes, 1);
+            hasta = desde.AddMonths(1).AddDays(-1);
+            return true;
+        }
+        private string SeleccionarCarpetaSalida()
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Seleccione la carpeta donde se exportará el reporte fiscal.",
+                UseDescriptionForTitle = true
+            };
+
+            return dialog.ShowDialog() == DialogResult.OK ? dialog.SelectedPath : string.Empty;
         }
         private void GuardarCsv(string fileName, string header, IEnumerable<string> lines)
         {

@@ -17,7 +17,7 @@ namespace SistemaFerreteriaV8.Clases
         public Color Azul = Color.FromArgb(0, 0, 255);
         public Color Verde = Color.FromArgb(0, 255, 0);
 
-        private static string _uri = "mongodb://localhost:27017/";
+        private static string _uri = AppInstanceSettings.GetDefaultMongoUri();
         private static string _databaseName = "ferreteria_default";
 
         public string URI => _uri;

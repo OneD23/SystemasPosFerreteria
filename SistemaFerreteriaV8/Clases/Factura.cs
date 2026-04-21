@@ -134,22 +134,29 @@ namespace SistemaFerreteriaV8.Clases
             }
         }
 
-        // Secuenciador atómico para Ids correlativos
         private static int GetNextSequenceValue(string name)
         {
-            var counterCollection = new MongoClient(new OneKeys().URI)
-                .GetDatabase(new OneKeys().DatabaseName)
-                .GetCollection<BsonDocument>("counters");
+            // Mantiene firma para compatibilidad, pero ahora calcula el siguiente Id
+            // según el último Id realmente persistido en facturas.
+            return GetNextInvoiceIdFromCollection();
+        }
 
-            var filter = Builders<BsonDocument>.Filter.Eq("_id", name);
-            var update = Builders<BsonDocument>.Update.Inc("seq", 1);
-            var options = new FindOneAndUpdateOptions<BsonDocument>
+        private static int GetNextInvoiceIdFromCollection()
+        {
+            try
             {
-                ReturnDocument = ReturnDocument.After,
-                IsUpsert = true
-            };
-            var result = counterCollection.FindOneAndUpdate(filter, update, options);
-            return result["seq"].AsInt32;
+                var ultimoId = collection
+                    .Find(Builders<Factura>.Filter.Empty)
+                    .Sort(Builders<Factura>.Sort.Descending(f => f.Id))
+                    .Project(f => f.Id)
+                    .FirstOrDefault();
+
+                return ultimoId > 0 ? ultimoId + 1 : 1;
+            }
+            catch
+            {
+                return 1;
+            }
         }
 
         public Factura()
@@ -212,6 +219,35 @@ namespace SistemaFerreteriaV8.Clases
             if (!FechaEliminacion.HasValue)
                 FechaEliminacion = DateTime.Now;
             await collection.ReplaceOneAsync(f => f.Id == this.Id, this);
+        }
+
+        public static async Task<int> EliminarPorRangoFechasAsync(DateTime fechaDesde, DateTime fechaHasta, string motivo, string eliminadoPorId = "", string eliminadoPorNombre = "")
+        {
+            var inicio = fechaDesde.Date;
+            var fin = fechaHasta.Date.AddDays(1).AddTicks(-1);
+
+            var filter = Builders<Factura>.Filter.And(
+                Builders<Factura>.Filter.Gte(f => f.Fecha, inicio),
+                Builders<Factura>.Filter.Lte(f => f.Fecha, fin),
+                Builders<Factura>.Filter.Eq(f => f.Eliminada, false),
+                Builders<Factura>.Filter.Eq(f => f.Cotizacion, false));
+
+            var facturas = await collection.Find(filter).ToListAsync();
+            var totalEliminadas = 0;
+            var motivoFinal = string.IsNullOrWhiteSpace(motivo) ? "Eliminación masiva por rango de fechas" : motivo.Trim();
+
+            foreach (var factura in facturas)
+            {
+                factura.MotivoEliminacion = motivoFinal;
+                factura.EliminadaPorId = eliminadoPorId ?? string.Empty;
+                factura.EliminadaPorNombre = eliminadoPorNombre ?? string.Empty;
+                factura.FechaEliminacion = DateTime.Now;
+
+                await factura.EliminarFacturaAsync();
+                totalEliminadas++;
+            }
+
+            return totalEliminadas;
         }
 
         private async Task ReponerInventarioPorEliminacionAsync()
