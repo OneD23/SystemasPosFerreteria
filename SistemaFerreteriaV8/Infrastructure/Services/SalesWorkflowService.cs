@@ -17,7 +17,7 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
         try
         {
-            var mapResult = await BuildPersistableListProductsAsync(request.Draft.Lines, request.ApplyStockMovement, operationId);
+            var mapResult = await BuildPersistableListProductsAsync(request.Draft.Lines, operationId);
             if (!mapResult.Success)
             {
                 await WriteAuditAsync(
@@ -38,8 +38,12 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
             var listProducts = mapResult.Products;
             var stockItems = listProducts
-                .Where(p => p.Producto != null && !string.Equals(p.Producto.Nombre, "Generico", StringComparison.OrdinalIgnoreCase))
-                .Select(p => new StockMovementItem(p.Producto.Id ?? string.Empty, p.Producto.Nombre ?? string.Empty, p.Cantidad))
+                .Zip(request.Draft.Lines, (persisted, draftLine) => new { persisted, draftLine })
+                .Where(x => x.persisted.Producto != null && !x.draftLine.IsGeneric)
+                .Select(x => new StockMovementItem(
+                    x.persisted.Producto!.Id ?? string.Empty,
+                    x.persisted.Producto.Nombre ?? string.Empty,
+                    x.persisted.Cantidad))
                 .ToList();
 
             var invoice = new Factura
@@ -206,7 +210,6 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
 
     private static async Task<(bool Success, string Message, List<ListProduct> Products)> BuildPersistableListProductsAsync(
         IReadOnlyCollection<InvoiceDraftLine> lines,
-        bool validateStock,
         string operationId)
     {
         var result = new List<ListProduct>();
@@ -218,7 +221,8 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
             {
                 product = new Productos
                 {
-                    Nombre = "Generico",
+                    Nombre = string.IsNullOrWhiteSpace(line.ProductName) ? "Generico" : line.ProductName,
+                    Descripcion = "Venta sin inventario",
                     Precio = new List<double> { line.UnitPrice, line.UnitPrice, line.UnitPrice, line.UnitPrice }
                 };
             }
@@ -228,18 +232,10 @@ public sealed class SalesWorkflowService : ISalesWorkflowService
                 if (!string.IsNullOrWhiteSpace(line.ProductId))
                 {
                     lookup = await AppServices.Product.FindByIdAsync(line.ProductId);
-                    if (validateStock)
-                    {
-                        var stock = await AppServices.Product.CheckStockAsync(line.ProductId, line.Quantity);
-                        if (!stock.Success)
-                            return (false, $"{stock.Message} '{line.ProductName}' (op={operationId}).", result);
-                    }
                 }
                 else
                 {
                     lookup = await AppServices.Product.FindByNameAsync(line.ProductName);
-                    if (validateStock && lookup.Product != null && lookup.Product.Cantidad < line.Quantity)
-                        return (false, $"Stock insuficiente para '{line.ProductName}' al mapear líneas persistibles (op={operationId}).", result);
                 }
 
                 if (!lookup.Found || lookup.Product == null)

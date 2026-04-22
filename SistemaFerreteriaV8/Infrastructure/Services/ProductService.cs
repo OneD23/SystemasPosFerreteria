@@ -143,7 +143,16 @@ public sealed class ProductService : IProductService
                         Reason: "sale_confirm",
                         OperationId: operationId));
 
-                    if (!adjustment.Success || adjustment.Product == null)
+                    if (!adjustment.Success)
+                    {
+                        var isInsufficientStock = adjustment.Message.Contains("cantidad resultante no puede ser negativa", StringComparison.OrdinalIgnoreCase);
+                        if (isInsufficientStock)
+                            continue;
+
+                        return new StockMovementResult(false, adjustment.Message, applied, applied.Count > 0, attempt);
+                    }
+
+                    if (adjustment.Product == null)
                         return new StockMovementResult(false, adjustment.Message, applied, applied.Count > 0, attempt);
 
                     applied.Add(new StockMovementAppliedItem(

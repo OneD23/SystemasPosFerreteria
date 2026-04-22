@@ -52,6 +52,7 @@ namespace SistemaFerreteriaV8
         {
             InitializeComponent();
             SistemaFerreteriaV8.Clases.ThemeManager.ApplyToForm(this);
+            AutoScroll = true;
 
             progressBarLoading = new ProgressBar
             {
@@ -82,8 +83,12 @@ namespace SistemaFerreteriaV8
 
             button1.Click += async (_, __) => await CambiarPaginaAsync(-1);
             button2.Click += async (_, __) => await CambiarPaginaAsync(1);
+            buttonEliminarPorFecha.Click += async (_, __) => await EliminarFacturasPorFechaAsync();
             Fecha1.ValueChanged += async (_, __) => await ReiniciarYRecargarAsync();
             Fecha2.ValueChanged += async (_, __) => await ReiniciarYRecargarAsync();
+
+            OrganizarLayoutFacturas();
+            Resize += (_, __) => OrganizarLayoutFacturas();
         }
 
         private async void VentanaFacturas_Load(object sender, EventArgs e)
@@ -181,6 +186,99 @@ namespace SistemaFerreteriaV8
             {
                 progressBarLoading.Visible = false;
             }
+        }
+
+        private async Task EliminarFacturasPorFechaAsync()
+        {
+            var desde = Fecha1.Value.Date;
+            var hasta = Fecha2.Value.Date;
+            if (hasta < desde)
+            {
+                MessageBox.Show("La fecha 'Hasta' no puede ser menor que 'Desde'.", "Validación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var confirmacion = MessageBox.Show(
+                $"Se eliminarán (lógicamente) las facturas entre {desde:dd/MM/yyyy} y {hasta:dd/MM/yyyy}.\n\n¿Desea continuar?",
+                "Eliminar facturas por fecha",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirmacion != DialogResult.Yes)
+                return;
+
+            buttonEliminarPorFecha.Enabled = false;
+            progressBarLoading.Visible = true;
+            try
+            {
+                int total = await Factura.EliminarPorRangoFechasAsync(
+                    desde,
+                    hasta,
+                    $"Eliminación por rango de fechas ({desde:yyyy-MM-dd} a {hasta:yyyy-MM-dd}) desde VentanaFacturas");
+
+                MessageBox.Show(
+                    total > 0
+                        ? $"Se eliminaron {total} factura(s) dentro del rango."
+                        : "No se encontraron facturas activas para eliminar en ese rango.",
+                    "Eliminar facturas por fecha",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                await ReiniciarYRecargarAsync();
+            }
+            finally
+            {
+                progressBarLoading.Visible = false;
+                buttonEliminarPorFecha.Enabled = true;
+            }
+        }
+
+        private void OrganizarLayoutFacturas()
+        {
+            const int margenLateral = 16;
+            const int separacion = 12;
+            const int topTitulo = 38;
+
+            int areaAncho = Math.Max(980, ClientSize.Width - (margenLateral * 2));
+            int xInicial = margenLateral;
+
+            label1.Location = new System.Drawing.Point(Math.Max(xInicial, (ClientSize.Width / 2) - (label1.Width / 2)), topTitulo);
+
+            int topFiltros = 118;
+            label4.Location = new System.Drawing.Point(xInicial, topFiltros + 4);
+            Fecha1.Width = 150;
+            Fecha1.Location = new System.Drawing.Point(label4.Right + 8, topFiltros);
+
+            label5.Location = new System.Drawing.Point(Fecha1.Right + separacion + 6, topFiltros + 4);
+            Fecha2.Width = 150;
+            Fecha2.Location = new System.Drawing.Point(label5.Right + 8, topFiltros);
+
+            buttonEliminarPorFecha.Size = new System.Drawing.Size(250, 34);
+            buttonEliminarPorFecha.Location = new System.Drawing.Point(Fecha2.Right + separacion + 4, topFiltros - 1);
+
+            int filtroAncho = Math.Min(370, Math.Max(300, areaAncho / 3));
+            groupBox1.Size = new System.Drawing.Size(filtroAncho, 84);
+
+            int xGrupoIdeal = (ClientSize.Width - margenLateral - groupBox1.Width);
+            int yGrupo = topFiltros - 35;
+            if (buttonEliminarPorFecha.Right + separacion > xGrupoIdeal)
+            {
+                yGrupo = topFiltros + 44;
+            }
+            groupBox1.Location = new System.Drawing.Point(xGrupoIdeal, yGrupo);
+
+            int topGrid = Math.Max(groupBox1.Bottom, buttonEliminarPorFecha.Bottom) + 14;
+            int bottomZona = 120;
+            ListaDeFacturas.Location = new System.Drawing.Point(xInicial, topGrid);
+            ListaDeFacturas.Size = new System.Drawing.Size(areaAncho, Math.Max(250, ClientSize.Height - topGrid - bottomZona));
+
+            int yBottom = ListaDeFacturas.Bottom + 20;
+            button1.Location = new System.Drawing.Point(xInicial + (areaAncho / 6), yBottom);
+            button2.Location = new System.Drawing.Point(xInicial + areaAncho - (areaAncho / 6) - button2.Width, yBottom);
+            Paginacion.Location = new System.Drawing.Point((ClientSize.Width / 2) - 60, yBottom + 9);
+
+            label2.Location = new System.Drawing.Point(xInicial + areaAncho - 220, yBottom - 42);
+            CantidadFactura.Location = new System.Drawing.Point(label2.Right + 8, yBottom - 42);
         }
 
         private async void Id_TextChanged(object sender, EventArgs e)

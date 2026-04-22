@@ -51,6 +51,7 @@
             button1 = new Button();
             button2 = new Button();
             Paginacion = new Label();
+            buttonEliminarPorFecha = new Button();
             ((System.ComponentModel.ISupportInitialize)ListaDeFacturas).BeginInit();
             groupBox1.SuspendLayout();
             SuspendLayout();
@@ -286,12 +287,26 @@
             Paginacion.TabIndex = 15;
             Paginacion.Text = "Página 1 de 1";
             // 
+            // buttonEliminarPorFecha
+            // 
+            buttonEliminarPorFecha.BackColor = Color.FromArgb(183, 28, 28);
+            buttonEliminarPorFecha.FlatStyle = FlatStyle.Flat;
+            buttonEliminarPorFecha.ForeColor = Color.White;
+            buttonEliminarPorFecha.Location = new Point(553, 125);
+            buttonEliminarPorFecha.Margin = new Padding(4, 3, 4, 3);
+            buttonEliminarPorFecha.Name = "buttonEliminarPorFecha";
+            buttonEliminarPorFecha.Size = new Size(278, 38);
+            buttonEliminarPorFecha.TabIndex = 16;
+            buttonEliminarPorFecha.Text = "Eliminar facturas por rango de fecha";
+            buttonEliminarPorFecha.UseVisualStyleBackColor = false;
+            // 
             // VentanaFacturas
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(12, 12, 12);
             ClientSize = new Size(1265, 763);
+            Controls.Add(buttonEliminarPorFecha);
             Controls.Add(Paginacion);
             Controls.Add(button2);
             Controls.Add(button1);
@@ -342,5 +357,6 @@
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Label Paginacion;
+        private System.Windows.Forms.Button buttonEliminarPorFecha;
     }
 }
