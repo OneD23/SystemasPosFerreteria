@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SistemaFerreteriaV8.Clases
@@ -42,20 +43,25 @@ namespace SistemaFerreteriaV8.Clases
         // Inicialización estática para usar siempre la misma instancia de colección
         static Caja()
         {
-            _cajaCollection = new MongoClient(new OneKeys().URI)
+            var settings = MongoClientSettings.FromConnectionString(new OneKeys().URI);
+            settings.ServerSelectionTimeout = TimeSpan.FromSeconds(2);
+            settings.ConnectTimeout = TimeSpan.FromSeconds(2);
+            settings.SocketTimeout = TimeSpan.FromSeconds(3);
+
+            _cajaCollection = new MongoClient(settings)
                 .GetDatabase(new OneKeys().DatabaseName)
                 .GetCollection<Caja>("caja2");
 
-            EnsureIndexes();
+            _ = Task.Run(EnsureIndexesSafeAsync);
         }
 
-        private static void EnsureIndexes()
+        private static async Task EnsureIndexesSafeAsync()
         {
             try
             {
-                var indexNames = _cajaCollection.Indexes
-                    .List()
-                    .ToList()
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var cursor = await _cajaCollection.Indexes.ListAsync(cancellationToken: cts.Token);
+                var indexNames = (await cursor.ToListAsync(cts.Token))
                     .Select(i => i.GetValue("name", "").AsString)
                     .ToHashSet();
 
@@ -72,8 +78,12 @@ namespace SistemaFerreteriaV8.Clases
                             PartialFilterExpression = partialOpenFilter
                         });
 
-                    _cajaCollection.Indexes.CreateOne(indexModel);
+                    await _cajaCollection.Indexes.CreateOneAsync(indexModel, cancellationToken: cts.Token);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Evita congelamientos en la UI si Mongo tarda durante inicialización de índices.
             }
             catch (MongoCommandException)
             {
