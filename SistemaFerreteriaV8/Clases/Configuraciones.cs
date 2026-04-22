@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -154,6 +155,20 @@ namespace SistemaFerreteriaV8.Clases
             }
         }
 
+        private static string ObtenerDetalleBreve(Exception ex)
+        {
+            if (ex == null || string.IsNullOrWhiteSpace(ex.Message))
+                return "No disponible";
+
+            var primeraLinea = ex.Message
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault() ?? "No disponible";
+
+            return primeraLinea.Length > 180
+                ? primeraLinea.Substring(0, 180) + "..."
+                : primeraLinea;
+        }
+
 
        
         public void Guardar()
@@ -188,29 +203,32 @@ namespace SistemaFerreteriaV8.Clases
             }
             catch (MongoDB.Driver.MongoConnectionException ex)
             {
+                Debug.WriteLine($"[MongoConnectionException] {ex}");
                 MostrarErrorConexionUnaVez(
                     "No se pudo conectar a la base de datos MongoDB.\n\n" +
-                    "Verifica que el servidor esté corriendo y la cadena de conexión sea correcta.\n\n" +
-                    "Detalles técnicos:\n" + ex.Message,
+                    "Verifica que el servidor esté corriendo y la dirección de conexión configurada sea correcta.\n\n" +
+                    "Detalle breve: " + ObtenerDetalleBreve(ex),
                     "Error de conexión",
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
             }
             catch (TimeoutException ex)
             {
+                Debug.WriteLine($"[TimeoutException] {ex}");
                 MostrarErrorConexionUnaVez(
                     "Tiempo de espera agotado al intentar conectar con la base de datos.\n\n" +
-                    "Revisa la conexión o el estado de MongoDB.\n\n" +
-                    "Detalles:\n" + ex.Message,
+                    "Revisa la conexión de red o el estado de MongoDB.\n\n" +
+                    "Detalle breve: " + ObtenerDetalleBreve(ex),
                     "Error de tiempo de espera",
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[Configuraciones.ObtenerPorId] {ex}");
                 MostrarErrorConexionUnaVez(
-                    "Ocurrió un error inesperado al consultar la base de datos:\n\n" +
-                    ex.Message,
+                    "Ocurrió un error inesperado al consultar la base de datos.\n\n" +
+                    "Detalle breve: " + ObtenerDetalleBreve(ex),
                     "Error inesperado",
                     System.Windows.Forms.MessageBoxIcon.Error);
                 return null;
